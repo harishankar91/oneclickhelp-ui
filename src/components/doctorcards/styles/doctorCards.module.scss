@@ -1,0 +1,522 @@
+/* Container & header */
+.container {
+  padding: 2rem 1rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.header {
+  text-align: center;
+  margin: 0 auto 0.75rem auto;
+  max-width: 1200px;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 0.25rem 0;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: #718096;
+  margin: 0;
+}
+
+/* Mobile Filter Toggle (visible on small screens) */
+.mobileFilterToggle {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 0.25rem;
+}
+
+.filterToggleBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  color: #495057;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+}
+
+.filterIndicator {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 10px;
+  height: 10px;
+  background-color: #dc3545;
+  border-radius: 50%;
+}
+
+.mobileResultsCount {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+/* Practo-style filter bar (desktop) */
+.filterBarWrap {
+  max-width: 1200px;
+  margin: 0.75rem auto 1.25rem auto;
+}
+
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+/* Individual chip (label + select) */
+.filterChip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+}
+
+.chipLabel {
+  font-size: 0.85rem;
+  color: #2d3748;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chipSelect {
+  appearance: none;
+  padding: 0.35rem 1.75rem 0.35rem 0.5rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 0.9rem;
+  color: #2d3748;
+  cursor: pointer;
+  min-width: 150px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #4a5568 50%),
+    linear-gradient(135deg, #4a5568 50%, transparent 50%),
+    linear-gradient(to right, #fff, #fff);
+  background-position:
+    calc(100% - 16px) calc(1em + 1px),
+    calc(100% - 11px) calc(1em + 1px),
+    100% 0;
+  background-size: 5px 5px, 5px 5px, 2.5em 3.5em;
+  background-repeat: no-repeat;
+
+  &:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.25);
+  }
+}
+
+.chipInput {
+  appearance: none;
+  padding: 0.35rem 1.75rem 0.35rem 0.5rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 0.9rem;
+  color: #2d3748;
+  cursor: pointer;
+  min-width: 150px;
+  
+  &:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.25);
+  }
+}
+
+/* All Filters dropdown panel (desktop) */
+.allFilters {
+  position: relative;
+}
+
+.allFiltersBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #cbd5e0;
+  background: #ffffff;
+  color: #2d3748;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.allFiltersPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  box-shadow: 0 10px 25px -8px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+.panelRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.panelRow label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.panelRow input, .panelRow select {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.9rem;
+  color: #2d3748;
+}
+
+.panelActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.clearBtn {
+  background: #6c757d;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.applyBtn {
+  background: #007bff;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Cards grid (same as before) */
+.hospitalName { font-weight: 700; }
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  justify-items: center;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  width: 100%;
+  max-width: 350px;
+  border: 1px solid #e2e8f0;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+}
+
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.photoContainer { margin-bottom: 1rem; }
+
+.doctorPhoto {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #e2e8f0;
+  transition: border-color 0.3s ease;
+}
+
+.card:hover .doctorPhoto { border-color: #4299e1; }
+
+.avatarPlaceholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #2d3748;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  font-weight: 700;
+  border: 4px solid #e2e8f0;
+}
+
+.doctorInfo { text-align: center; }
+
+.doctorName {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0 0 0.25rem 0;
+}
+
+.specialty {
+  font-size: 0.875rem;
+  color: #4299e1;
+  margin: 0;
+  font-weight: 700;
+}
+
+.qualifications { color: #4a5568; font-size: 0.9rem; margin: 0.2rem 0; }
+.experience { color: #4a5568; font-size: 0.9rem; margin: 0.1rem 0 0; }
+
+/* Patient stories badge */
+.storyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #e6ffed;
+  border: 1px solid #b7f0c8;
+  color: #0f9d58;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.storyPct { font-weight: 700; }
+.storyText { font-weight: 600; }
+
+.cardBody { margin-bottom: 1.25rem; }
+
+.feesContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.9rem;
+  padding: 0.75rem;
+  background-color: #f7fafc;
+  border-radius: 8px;
+}
+
+.feesLabel {
+  font-size: 0.875rem;
+  color: #4a5568;
+  font-weight: 500;
+}
+
+.fees {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #38a169;
+}
+
+.hospitalContainer { margin-top: 0.25rem; }
+.hospitalAddress { color: #4a5568; margin: 0.15rem 0 0 0; }
+
+.cardFooter { display: flex; justify-content: center; }
+
+.tokenButton {
+  width: 100%;
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Loading & error */
+.loadingContainer {
+  display: grid;
+  place-items: center;
+  padding: 3rem 1rem;
+}
+
+.spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #3182ce;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.errorContainer {
+  max-width: 1200px;
+  margin: 1rem auto;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  color: #c53030;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+}
+
+.noDoctors {
+  color: #6c757d;
+  max-width: 1200px;
+  margin: 1rem auto;
+}
+
+/* Mobile sidebar styles */
+.mobileFiltersPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 85%;
+  max-width: 420px;
+  height: 100vh;
+  background: #ffffff;
+  z-index: 1001;
+  padding: 1rem;
+  box-shadow: -10px 0 30px rgba(0,0,0,0.25);
+  overflow-y: auto;
+  transform: translateX(0);
+  transition: transform 0.25s ease;
+}
+
+.filtersHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.filtersHeader h3 { margin: 0; font-size: 1.1rem; color: #2c3e50; }
+.closeFiltersBtn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6c757d;
+}
+
+.filtersGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+}
+.filterGroup label {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: #495057;
+}
+.filterGroup input,
+.filterGroup select {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background-color: white;
+}
+
+.filterActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.clearFiltersBtn {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.applyFiltersBtn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+/* overlay behind mobile sidebar */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.45);
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+  .filterBarWrap { display: none; } /* hide desktop bar on mobile */
+  .mobileFilterToggle { display: flex; }
+  .cardsGrid { gap: 1.25rem; }
+  .filterToggleBtn { font-size: 0.95rem; }
+}
+
+@media (min-width: 769px) {
+  .mobileFiltersPanel,
+  .overlay,
+  .mobileFilterToggle { display: none; }
+}
+
+@media (min-width: 768px) {
+  .cardsGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 1024px) {
+  .cardsGrid { grid-template-columns: repeat(3, 1fr); }
+  .container { padding: 2rem 2rem; }
+  .title { font-size: 1.75rem; }
+  .subtitle { font-size: 1.05rem; }
+}
+
+@media (max-width: 480px) {
+  .container { padding: 1rem 0.5rem; }
+  .cardsGrid { grid-template-columns: 1fr; gap: 1.25rem; }
+  .card { padding: 1.25rem; }
+  .doctorPhoto, .avatarPlaceholder { width: 100px; height: 100px; }
+}
