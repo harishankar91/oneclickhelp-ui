@@ -23,6 +23,12 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <meta
+          name="fast2sms"
+          content="LBMA6bhTf2MG1QL9yQA89zc2h4tf0PRD"
+        />
+      </head>
       <body
         className={`${inter.variable} ${robotoMono.variable} antialiased bg-white text-gray-900`}
       >
