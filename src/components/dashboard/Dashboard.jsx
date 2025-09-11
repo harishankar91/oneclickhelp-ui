@@ -263,7 +263,7 @@ export default function Dashboard() {
                 className="border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">All</option>
-                <option value="1">Booked/Confirmed</option>
+                <option value="1">Booked</option>
                 <option value="2">Completed</option>
                 <option value="3">Cancelled</option>
                 <option value="4">Checked In</option>
@@ -349,6 +349,12 @@ export default function Dashboard() {
                               <span className="text-sm text-gray-600 w-32 flex-shrink-0">Booking Date:</span>
                               <span className="text-sm font-medium text-gray-900">{formatDate(token.bookingDate)}</span>
                             </div>
+                            <div className="flex">
+                                <span className="text-sm text-gray-600 w-32 flex-shrink-0">Arrival Time:</span>
+                                <span className="text-sm font-medium text-gray-900">
+                                  {token.estimatedArrivalTime || "Not specified"}
+                                </span>
+                              </div>
                           </div>
                         </div>
 
@@ -394,12 +400,7 @@ export default function Dashboard() {
                                   {token.hospitalName || "Not specified"}
                                 </span>
                               </div>
-                              <div className="flex">
-                                <span className="text-sm text-gray-600 w-32 flex-shrink-0">Arrival Time:</span>
-                                <span className="text-sm font-medium text-gray-900">
-                                  {token.estimatedArrivalTime || "Not specified"}
-                                </span>
-                              </div>
+                              
                               <div className="flex">
                                 <span className="text-sm text-gray-600 w-32 flex-shrink-0">Address:</span>
                                 <span className="text-sm font-medium text-gray-900">

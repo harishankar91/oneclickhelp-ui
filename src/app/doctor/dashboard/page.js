@@ -7,7 +7,7 @@ import Link from "next/link"
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('today')
   const [doctorData, setDoctorData] = useState(null)
-  const [statusList, setStatusList] = useState([]) // For storing status options
+  const [statusList, setStatusList] = useState([])
   const [statsData, setStatsData] = useState({
     totalTokens: 0,
     totalAppointments: 0,
@@ -20,6 +20,20 @@ export default function Dashboard() {
   const [appointmentsLoading, setAppointmentsLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [showSlotsModal, setShowSlotsModal] = useState(false)
+  const [showShiftsModal, setShowShiftsModal] = useState(false)
+  const [doctorSlots, setDoctorSlots] = useState([])
+  const [doctorShifts, setDoctorShifts] = useState([])
+  const [availableShifts, setAvailableShifts] = useState([])
+  const [newSlot, setNewSlot] = useState({
+    date: new Date().toISOString().split('T')[0],
+    startTime: "09:00",
+    endTime: "10:00"
+  })
+  const [newShift, setNewShift] = useState({
+    shiftId: "",
+    maxAllowedPatients: 10
+  })
   
   const dropdownRef = useRef(null)
   const router = useRouter()
@@ -35,8 +49,9 @@ export default function Dashboard() {
     }
     
     fetchDoctorData()
-    fetchStatusList() // Fetch the status options
+    fetchStatusList()
     fetchTodayTokens()
+    fetchAvailableShifts()
     
     // Add event listener to close dropdown when clicking outside
     document.addEventListener('mousedown', handleClickOutside)
@@ -74,6 +89,47 @@ export default function Dashboard() {
     }
   }
 
+  // Fetch available shifts from API
+  const fetchAvailableShifts = async () => {
+    try {
+      const response = await fetch('https://api.oneclickhelp.in/api/getOPDShiftDetails')
+      const data = await response.json()
+      if (data.status) {
+        setAvailableShifts(data.data)
+      }
+    } catch (error) {
+      console.error("Error fetching available shifts:", error)
+    }
+  }
+
+  // Fetch doctor's slots
+  const fetchDoctorSlots = async () => {
+    try {
+      const response = await fetch(`https://api.oneclickhelp.in/api/getDoctorSlots?doctorId=${doctor.doctorId}&date=${selectedDate}`)
+      const data = await response.json()
+      setDoctorSlots(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("Error fetching doctor slots:", error)
+      setDoctorSlots([])
+    }
+  }
+
+  // Fetch doctor's shifts
+  const fetchDoctorShifts = async () => {
+    try {
+      const response = await fetch(`https://api.oneclickhelp.in/api/getDoctorOPDShifts?doctorId=${userId}`)
+      const data = await response.json()
+      if (data.status) {
+        setDoctorShifts(data.data)
+      } else {
+        setDoctorShifts([])
+      }
+    } catch (error) {
+      console.error("Error fetching doctor shifts:", error)
+      setDoctorShifts([])
+    }
+  }
+
   const fetchTodayTokens = async () => {
     try {
       const response = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?date=${selectedDate}&doctorId=${userId}`)
@@ -98,9 +154,9 @@ export default function Dashboard() {
       // Update stats
       setStatsData({
         totalTokens: data.length,
-        totalAppointments: 0, // You'll need to fetch appointments from another API
+        totalAppointments: 0,
         completedTokens: data.filter(t => t.status === 'Completed').length,
-        completedAppointments: 0 // You'll need to fetch appointments from another API
+        completedAppointments: 0
       })
       
       setLoading(false)
@@ -112,7 +168,7 @@ export default function Dashboard() {
 
   const handleDateFilter = async (date) => {
     setSelectedDate(date)
-    setAppointmentsLoading(true) // Set appointments loading to true
+    setAppointmentsLoading(true)
     
     try {
       const response = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?date=${date}&doctorId=${userId}`)
@@ -141,17 +197,78 @@ export default function Dashboard() {
         completedAppointments: 0
       })
       
-      setAppointmentsLoading(false) // Set appointments loading to false
+      setAppointmentsLoading(false)
     } catch (error) {
       console.error("Error fetching filtered token data:", error)
-      setAppointmentsLoading(false) // Set appointments loading to false even on error
+      setAppointmentsLoading(false)
+    }
+  }
+
+  // Add a new slot
+  const addSlot = async () => {
+    try {
+      const response = await fetch('https://api.oneclickhelp.in/api/addDoctorSlots', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          doctorId: doctorData.doctorId,
+          date: newSlot.date,
+          startTime: newSlot.startTime,
+          endTime: newSlot.endTime
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.status) {
+        alert('Slot added successfully!')
+        setShowSlotsModal(false)
+        fetchDoctorSlots()
+      } else {
+        alert('Failed to add slot: ' + result.message)
+      }
+    } catch (error) {
+      console.error("Error adding slot:", error)
+      alert('Error adding slot. Please try again.')
+    }
+  }
+
+  // Add a new shift
+  const addShift = async () => {
+    try {
+      const response = await fetch('https://api.oneclickhelp.in/api/addShiftAndMaxPatients', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          doctorId: userId,
+          shiftId: parseInt(newShift.shiftId),
+          maxAllowedPatients: parseInt(newShift.maxAllowedPatients)
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.status) {
+        alert('Shift added successfully!')
+        setShowShiftsModal(false)
+        fetchDoctorShifts()
+      } else {
+        alert('Failed to add shift: ' + result.message)
+      }
+    } catch (error) {
+      console.error("Error adding shift:", error)
+      alert('Error adding shift. Please try again.')
     }
   }
 
   const handleLogout = () => {
     sessionStorage.removeItem("userId")
     sessionStorage.removeItem("userName")
-    router.push('/login')
+    router.push('/doctor/login')
   }
 
   // Function to handle status update using the API
@@ -183,7 +300,7 @@ export default function Dashboard() {
         );
         
         // If the status is "Completed", update the stats
-        if (statusId === 5) { // 5 is the statusId for "Completed"
+        if (statusId === 5) {
           setStatsData(prev => ({
             ...prev,
             completedTokens: prev.completedTokens + 1
@@ -197,6 +314,18 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error updating status:", error);
     }
+  }
+
+  // Open slots modal and fetch current slots
+  const openSlotsModal = () => {
+    setShowSlotsModal(true)
+    fetchDoctorSlots()
+  }
+
+  // Open shifts modal and fetch current shifts
+  const openShiftsModal = () => {
+    setShowShiftsModal(true)
+    fetchDoctorShifts()
   }
 
   if (loading) {
@@ -276,6 +405,33 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Management Buttons */}
+          <div className="flex flex-wrap gap-4 mb-6">
+            {doctorData?.is_appointment && (
+              <button 
+                onClick={openSlotsModal}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Manage Slots
+              </button>
+            )}
+            
+            {doctorData?.is_token && (
+              <button 
+                onClick={openShiftsModal}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Manage Shifts
+              </button>
+            )}
+          </div>
+          
           {/* Stats Section */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white rounded-xl shadow-sm p-6 border border-blue-100">
@@ -465,6 +621,168 @@ export default function Dashboard() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Slots Modal */}
+      {showSlotsModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg lg:max-w-2xl">
+            <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Manage Appointment Slots
+              </h3>
+              <button 
+                onClick={() => setShowSlotsModal(false)}
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
+              >
+                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                </svg>
+                <span className="sr-only">Close modal</span>
+              </button>
+            </div>
+            
+            <div className="p-4 md:p-5 space-y-4 overflow-y-auto max-h-96">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={newSlot.date}
+                    onChange={(e) => setNewSlot({...newSlot, date: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    value={newSlot.startTime}
+                    onChange={(e) => setNewSlot({...newSlot, startTime: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                  <input
+                    type="time"
+                    value={newSlot.endTime}
+                    onChange={(e) => setNewSlot({...newSlot, endTime: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <button
+                onClick={addSlot}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Add Slot
+              </button>
+              
+              <div className="mt-6">
+                <h4 className="text-lg font-medium text-gray-900 mb-2">Existing Slots for {newSlot.date}</h4>
+                {doctorSlots.length > 0 ? (
+                  <ul className="divide-y divide-gray-200">
+                    {doctorSlots.map(slot => (
+                      <li key={slot.id} className="py-3 flex justify-between items-center">
+                        <div>
+                          <span className="font-medium">{slot.startTime} - {slot.endTime}</span>
+                          <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${slot.isBooked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                            {slot.isBooked ? 'Booked' : 'Available'}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">No slots available for this date.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shifts Modal */}
+      {showShiftsModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg">
+            <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Manage OPD Shifts
+              </h3>
+              <button 
+                onClick={() => setShowShiftsModal(false)}
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
+              >
+                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                </svg>
+                <span className="sr-only">Close modal</span>
+              </button>
+            </div>
+            
+            <div className="p-4 md:p-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Shift</label>
+                  <select
+                    value={newShift.shiftId}
+                    onChange={(e) => setNewShift({...newShift, shiftId: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  >
+                    <option value="">Select a shift</option>
+                    {availableShifts.map(shift => (
+                      <option key={shift.shiftId} value={shift.shiftId}>{shift.shiftName}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Patients</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newShift.maxAllowedPatients}
+                    onChange={(e) => setNewShift({...newShift, maxAllowedPatients: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <button
+                onClick={addShift}
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-md flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Add Shift
+              </button>
+              
+              <div className="mt-6">
+                <h4 className="text-lg font-medium text-gray-900 mb-2">Current Shifts</h4>
+                {doctorShifts.length > 0 ? (
+                  <ul className="divide-y divide-gray-200">
+                    {doctorShifts.map(shift => (
+                      <li key={shift.shiftId} className="py-3">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{shift.shiftName}</span>
+                          <span className="text-sm text-gray-500">{shift.startTime} - {shift.endTime}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">No shifts configured yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

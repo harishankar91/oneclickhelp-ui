@@ -260,7 +260,7 @@ export default function Register() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="w-full max-w-4xl bg-white p-6 md:p-8 rounded-2xl shadow-xl">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-800 mb-2">Doctor Registration</h1>
+          <h1 className="text-3xl font-bold text-[#2c96fc] mb-2">Doctor Registration</h1>
           <p className="text-gray-600">Complete your profile in 3 simple steps</p>
         </div>
 
@@ -269,7 +269,7 @@ export default function Register() {
           <div className="flex justify-between items-center relative">
             <div className="absolute top-4 left-0 right-0 h-1.5 bg-gray-200 -z-10 rounded-full">
               <div
-                className="h-1.5 bg-blue-600 transition-all duration-500 rounded-full"
+                className="h-1.5 bg-[#2c96fc] transition-all duration-500 rounded-full"
                 style={{ width: `${(step - 1) * 50}%` }}
               ></div>
             </div>
@@ -277,14 +277,14 @@ export default function Register() {
               <div key={i} className="flex flex-col items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    step >= i ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-500"
+                    step >= i ? "bg-[#2c96fc] text-white" : "bg-gray-200 text-gray-500"
                   } font-semibold transition-colors duration-300`}
                 >
                   {i}
                 </div>
                 <span
                   className={`text-sm mt-2 ${
-                    step === i ? "font-medium text-blue-600" : "text-gray-500"
+                    step === i ? "font-medium text-[#2c96fc]" : "text-gray-500"
                   }`}
                 >
                   {i === 1 ? "Basic Info" : i === 2 ? "Professional Info" : "Hospital/Clinic Info"}
@@ -674,7 +674,7 @@ export default function Register() {
                       name="is_token" 
                       checked={formData.is_token}
                       onChange={handleChange}
-                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                      className="w-5 h-5 text-[#2c96fc] rounded focus:ring-blue-500"
                     /> 
                     <span className="text-gray-700 font-medium">Token Available</span>
                   </label>
@@ -684,7 +684,7 @@ export default function Register() {
                       name="is_appointment" 
                       checked={formData.is_appointment}
                       onChange={handleChange}
-                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                      className="w-5 h-5 text-[#2c96fc] rounded focus:ring-blue-500"
                     /> 
                     <span className="text-gray-700 font-medium">Appointment Available</span>
                   </label>
@@ -699,7 +699,7 @@ export default function Register() {
                         name="is_fees_online" 
                         checked={formData.is_fees_online}
                         onChange={handleChange}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                        className="w-5 h-5 text-[#2c96fc] rounded focus:ring-blue-500"
                       /> 
                       <span className="text-gray-700 font-medium">Consultation Fees Paid Online</span>
                     </label>
@@ -730,7 +730,7 @@ export default function Register() {
               <button
                 type="button"
                 onClick={nextStep}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
+                className="px-6 py-3 bg-[#2c96fc] text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
               >
                 Continue
               </button>

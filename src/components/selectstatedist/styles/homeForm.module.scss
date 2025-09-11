@@ -1,8 +1,8 @@
 // homeForm.module.scss
 
 .container {
-  padding: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+  padding: 0rem;
+  background: linear-gradient(135deg, #2c96fc 0%, #2c96fc 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11,7 +11,7 @@
 .card {
   border-radius: 12px;
   padding: 2rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  // box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   width: 100%;
   max-width: 800px;
 }
