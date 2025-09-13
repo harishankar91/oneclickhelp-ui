@@ -396,17 +396,17 @@ export default function DoctorCards({ districtId, locationName = "" }) {
               <div key={doctor.id ?? doctor.doctorId} className={styles.card}>
                 <div className={styles.cardHeader}>
                   <div className={styles.photoContainer}>
-                    {doctor?.photo_url ? (
+                    {/* {doctor?.photo_url ? ( */}
                       <img
-                        src={`https://api.oneclickhelp.in${doctor.photo_url}`}
+                        src={doctor.photo_url ? `https://api.oneclickhelp.in${doctor.photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
                         alt={`${doctor?.name ?? "Doctor"} photo`}
                         className={styles.doctorPhoto}
                       />
-                    ) : (
+                    {/* ) : (
                       <div className={styles.avatarPlaceholder}>
                         {(doctor?.name || "D").charAt(0)}
                       </div>
-                    )}
+                    )} */}
                   </div>
 
                   <div className={styles.doctorInfo}>

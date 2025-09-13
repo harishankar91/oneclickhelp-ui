@@ -16,6 +16,10 @@ export default function Dashboard() {
   const [filterStatus, setFilterStatus] = useState("all")
   const [doctorDetails, setDoctorDetails] = useState({}) // Store doctor details by ID
   const [statusList, setStatusList] = useState([]) // Store token status list
+  const [liveStatus, setLiveStatus] = useState(null) // Store live status data
+  const [showLiveStatus, setShowLiveStatus] = useState(false) // Control popup visibility
+  const [loadingLiveStatus, setLoadingLiveStatus] = useState(false) // Loading state for live status
+  const [dateFilter, setDateFilter] = useState("") // Date filter for both tokens and appointments
 
   useEffect(() => {
     // Check if user is logged in
@@ -32,6 +36,27 @@ export default function Dashboard() {
       fetchUserData(userId)
     })
   }, [router])
+
+  const fetchLiveStatus = async (doctorId, tokenId) => {
+    setLoadingLiveStatus(true)
+    try {
+      const res = await fetch(`https://api.oneclickhelp.in/api/liveStatus?doctorId=${doctorId}&token=${tokenId}`)
+      if (!res.ok) throw new Error("Failed to fetch live status")
+      const data = await res.json()
+      setLiveStatus(data)
+      setShowLiveStatus(true)
+    } catch (err) {
+      console.error("Error fetching live status:", err)
+      alert("Failed to fetch live status. Please try again.")
+    } finally {
+      setLoadingLiveStatus(false)
+    }
+  }
+
+  const closeLiveStatus = () => {
+    setShowLiveStatus(false)
+    setLiveStatus(null)
+  }
 
   const fetchStatusList = async () => {
     try {
@@ -170,19 +195,36 @@ export default function Dashboard() {
     router.push('/')
   }
 
-  const filteredTokens = filterStatus === "all"
-    ? tokens
-    : tokens.filter(token => token.statusId && token.statusId.toString() === filterStatus)
+  // Filter tokens by status and date
+  const filteredTokens = tokens.filter(token => {
+    const statusMatch = filterStatus === "all" || 
+      (token.statusId && token.statusId.toString() === filterStatus);
+    
+    const dateMatch = !dateFilter || 
+      (token.bookingDate && token.bookingDate.split('T')[0] === dateFilter);
+    
+    return statusMatch && dateMatch;
+  });
 
-  const filteredAppointments = filterStatus === "all"
-    ? appointments
-    : appointments.filter(appointment => {
-      // For appointments, we need to map the status string to a filter value
-      if (filterStatus === "1") return appointment.status === "Booked" || appointment.status === "Confirmed";
-      if (filterStatus === "2") return appointment.status === "Completed";
-      if (filterStatus === "3") return appointment.status === "Cancelled";
-      return false;
-    })
+  // Filter appointments by status and date
+  const filteredAppointments = appointments.filter(appointment => {
+    // For appointments, we need to map the status string to a filter value
+    let statusMatch = false;
+    if (filterStatus === "all") {
+      statusMatch = true;
+    } else if (filterStatus === "1") {
+      statusMatch = appointment.status === "Booked" || appointment.status === "Confirmed";
+    } else if (filterStatus === "2") {
+      statusMatch = appointment.status === "Completed";
+    } else if (filterStatus === "3") {
+      statusMatch = appointment.status === "Cancelled";
+    }
+    
+    const dateMatch = !dateFilter || 
+      (appointment.bookingDate && appointment.bookingDate.split('T')[0] === dateFilter);
+    
+    return statusMatch && dateMatch;
+  });
 
   if (loading) {
     return (
@@ -254,23 +296,35 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="mt-4 md:mt-0">
-              <label htmlFor="status-filter" className="text-sm font-medium text-gray-700 mr-2">Filter by status:</label>
-              <select
-                id="status-filter"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">All</option>
-                <option value="1">Booked</option>
-                <option value="2">Completed</option>
-                <option value="3">Cancelled</option>
-                <option value="4">Checked In</option>
-                <option value="5">Waiting</option>
-                <option value="6">With Doctor</option>
-                <option value="7">Missed</option>
-              </select>
+            <div className="mt-4 md:mt-0 flex flex-col md:flex-row gap-4">
+              <div>
+                <label htmlFor="date-filter" className="text-sm font-medium text-gray-700 mr-2">Filter by date:</label>
+                <input
+                  type="date"
+                  id="date-filter"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="status-filter" className="text-sm font-medium text-gray-700 mr-2">Filter by status:</label>
+                <select
+                  id="status-filter"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All</option>
+                  <option value="1">Booked</option>
+                  <option value="2">Completed</option>
+                  <option value="3">Cancelled</option>
+                  <option value="4">Checked In</option>
+                  <option value="5">Waiting</option>
+                  <option value="6">With Doctor</option>
+                  <option value="7">Missed</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -294,8 +348,11 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">No tokens found</h3>
-                  <p className="text-gray-600 mb-6">You haven't booked any tokens yet.</p>
-                 
+                  <p className="text-gray-600 mb-6">
+                    {dateFilter || filterStatus !== "all" 
+                      ? "No tokens match your filters. Try changing your filter criteria." 
+                      : "You haven't booked any tokens yet."}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -324,6 +381,32 @@ export default function Dashboard() {
                           </div>
                         </div>
 
+                        {/* Live Status Button */}
+                        <div className="mb-4">
+                          <button
+                            onClick={() => fetchLiveStatus(token.doctorId, token.token)}
+                            disabled={loadingLiveStatus}
+                            className="w-full bg-green-100 hover:bg-green-200 text-green-800 py-2 px-4 rounded-md flex items-center justify-center transition-colors duration-200"
+                          >
+                            {loadingLiveStatus ? (
+                              <>
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-green-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Loading Status...
+                              </>
+                            ) : (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                                Check Live Status
+                              </>
+                            )}
+                          </button>
+                        </div>
+
                         {/* Patient Information */}
                         <div className="mb-6">
                           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
@@ -349,6 +432,12 @@ export default function Dashboard() {
                               <span className="text-sm text-gray-600 w-32 flex-shrink-0">Booking Date:</span>
                               <span className="text-sm font-medium text-gray-900">{formatDate(token.bookingDate)}</span>
                             </div>
+
+                            <div className="flex">
+                              <span className="text-sm text-gray-600 w-32 flex-shrink-0">Shift:</span>
+                              <span className="text-sm font-medium text-gray-900">{token.shiftName}</span>
+                            </div>
+
                             <div className="flex">
                                 <span className="text-sm text-gray-600 w-32 flex-shrink-0">Arrival Time:</span>
                                 <span className="text-sm font-medium text-gray-900">
@@ -411,11 +500,79 @@ export default function Dashboard() {
                             </div>
                           </div>
                         )}
-
-
                       </div>
                     )
                   })}
+
+                {showLiveStatus && (
+                  <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+                    {/* Blurry Background */}
+                    <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm" onClick={closeLiveStatus}></div>
+                    
+                    {/* Popup Content */}
+                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative z-10">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-bold text-gray-800">Live Token Status</h3>
+                        <button onClick={closeLiveStatus} className="text-gray-500 hover:text-gray-700">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {liveStatus ? (
+                        <div className="space-y-4">
+                          <div className="bg-blue-50 p-4 rounded-lg">
+                            <h4 className="font-semibold text-blue-800 mb-2">Doctor: {liveStatus.doctorName}</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="bg-white p-3 rounded-md shadow-sm">
+                                <p className="text-sm text-gray-600">Current Token</p>
+                                <p className="text-2xl font-bold text-blue-600">{liveStatus.currentToken}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-md shadow-sm">
+                                <p className="text-sm text-gray-600">Your Token</p>
+                                <p className="text-2xl font-bold text-green-600">{liveStatus.yourToken}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-md shadow-sm">
+                                <p className="text-sm text-gray-600">Waiting Patients</p>
+                                <p className="text-2xl font-bold text-orange-600">{liveStatus.waitingPatients}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-md shadow-sm">
+                                <p className="text-sm text-gray-600">Estimated Time</p>
+                                <p className="text-2xl font-bold text-purple-600">{liveStatus.estimatedTime} min</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-gray-100 p-4 rounded-lg">
+                            <h4 className="font-semibold text-gray-800 mb-2">Status Summary</h4>
+                            <p className="text-gray-600">
+                              {liveStatus.yourToken === liveStatus.currentToken 
+                                ? "It's your turn now! Please proceed to the doctor's room."
+                                : liveStatus.yourToken > liveStatus.currentToken
+                                ? `There are ${liveStatus.waitingPatients} patients ahead of you. Estimated wait time is ${liveStatus.estimatedTime} minutes.`
+                                : "Your token has already been processed."}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                          <p className="text-gray-600">Loading status information...</p>
+                        </div>
+                      )}
+
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          onClick={closeLiveStatus}
+                          className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors duration-200"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 </div>
               )}
             </div>
@@ -436,8 +593,11 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">No appointments found</h3>
-                  <p className="text-gray-600 mb-6">You haven't booked any appointments yet.</p>
-                  
+                  <p className="text-gray-600 mb-6">
+                    {dateFilter || filterStatus !== "all" 
+                      ? "No appointments match your filters. Try changing your filter criteria." 
+                      : "You haven't booked any appointments yet."}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -482,6 +642,10 @@ export default function Dashboard() {
                               <span className="text-sm text-gray-600 w-28 flex-shrink-0">Gender:</span>
                               <span className="text-sm font-medium text-gray-900">{appointment.patientGender}</span>
                             </div>
+                            <div className="flex">
+                              <span className="text-sm text-gray-600 w-28 flex-shrink-0">Booking Date:</span>
+                              <span className="text-sm font-medium text-gray-900">{formatDate(appointment.bookingDate)}</span>
+                            </div>
                           </div>
                         </div>
 
@@ -519,7 +683,6 @@ export default function Dashboard() {
                             </div>
                           </div>
                         </div>
-
                       </div>
                     )
                   })}

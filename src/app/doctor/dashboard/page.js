@@ -24,20 +24,22 @@ export default function Dashboard() {
   const [showShiftsModal, setShowShiftsModal] = useState(false)
   const [doctorSlots, setDoctorSlots] = useState([])
   const [doctorShifts, setDoctorShifts] = useState([])
-  const [availableShifts, setAvailableShifts] = useState([])
   const [newSlot, setNewSlot] = useState({
     date: new Date().toISOString().split('T')[0],
     startTime: "09:00",
     endTime: "10:00"
   })
   const [newShift, setNewShift] = useState({
-    shiftId: "",
+    shiftName: "",
+    startTime: "09:00",
+    endTime: "17:00",
     maxAllowedPatients: 10
   })
-  
+  const [slotFilterDate, setSlotFilterDate] = useState(new Date().toISOString().split('T')[0])
+
   const dropdownRef = useRef(null)
   const router = useRouter()
-  
+
   // Get user data from session storage
   const userId = typeof window !== 'undefined' ? sessionStorage.getItem("userId") : null
   const userName = typeof window !== 'undefined' ? sessionStorage.getItem("userName") : null
@@ -47,15 +49,15 @@ export default function Dashboard() {
       router.push('/login')
       return
     }
-    
+
     fetchDoctorData()
     fetchStatusList()
-    fetchTodayTokens()
-    fetchAvailableShifts()
-    
+    fetchTodayBookings()
+    fetchUpcomingBookings()
+
     // Add event listener to close dropdown when clicking outside
     document.addEventListener('mousedown', handleClickOutside)
-    
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
@@ -89,23 +91,11 @@ export default function Dashboard() {
     }
   }
 
-  // Fetch available shifts from API
-  const fetchAvailableShifts = async () => {
+  // Fetch doctor's slots with date filtering
+  const fetchDoctorSlots = async (date = null) => {
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/getOPDShiftDetails')
-      const data = await response.json()
-      if (data.status) {
-        setAvailableShifts(data.data)
-      }
-    } catch (error) {
-      console.error("Error fetching available shifts:", error)
-    }
-  }
-
-  // Fetch doctor's slots
-  const fetchDoctorSlots = async () => {
-    try {
-      const response = await fetch(`https://api.oneclickhelp.in/api/getDoctorSlots?doctorId=${doctor.doctorId}&date=${selectedDate}`)
+      const filterDate = date || slotFilterDate;
+      const response = await fetch(`https://api.oneclickhelp.in/api/getDoctorSlots?doctorId=${doctorData.doctorId}&date=${filterDate}`)
       const data = await response.json()
       setDoctorSlots(Array.isArray(data) ? data : [])
     } catch (error) {
@@ -130,13 +120,16 @@ export default function Dashboard() {
     }
   }
 
-  const fetchTodayTokens = async () => {
+  // Fetch today's bookings (both tokens and appointments)
+  const fetchTodayBookings = async () => {
     try {
-      const response = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?date=${selectedDate}&doctorId=${userId}`)
-      const data = await response.json()
-      
-      // Process token data for today's appointments
-      const todayAppointments = data.map(token => ({
+      let todayBookings = [];
+
+      // Fetch tokens
+      const tokenResponse = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?fromDate=${selectedDate}&toDate=${selectedDate}&doctorId=${userId}`)
+      const tokenData = await tokenResponse.json()
+
+      const tokenBookings = tokenData.map(token => ({
         id: token.id,
         patient: token.patientName,
         time: token.estimatedArrivalTime || 'Not specified',
@@ -146,35 +139,121 @@ export default function Dashboard() {
         bookingType: 'Token',
         patientPhone: token.patientPhone,
         patientGender: token.patientGender,
-        tokenNumber: token.token
+        tokenNumber: token.token,
+        date: token.date
       }))
-      
-      setAppointmentsToday(todayAppointments)
-      
+
+      todayBookings = [...todayBookings, ...tokenBookings];
+
+      // Fetch appointments
+      const appointmentResponse = await fetch(`https://api.oneclickhelp.in/api/getAppointmentsByDocIdAndDate?fromDate=${selectedDate}&toDate=${selectedDate}&doctorId=${userId}`)
+      const appointmentData = await appointmentResponse.json()
+
+      const appointmentBookings = appointmentData.map(appointment => ({
+        id: appointment.id,
+        patient: appointment.patientName,
+        time: appointment.appointmentTime || 'Not specified',
+        status: appointment.status,
+        statusId: appointment.statusId,
+        type: 'Appointment',
+        bookingType: 'Appointment',
+        patientPhone: appointment.patientPhone,
+        patientGender: appointment.patientGender,
+        date: appointment.appointmentDate
+      }))
+
+      todayBookings = [...todayBookings, ...appointmentBookings];
+
+      setAppointmentsToday(todayBookings)
+
       // Update stats
+      const tokenCount = todayBookings.filter(b => b.bookingType === 'Token').length;
+      const appointmentCount = todayBookings.filter(b => b.bookingType === 'Appointment').length;
+      const completedTokenCount = todayBookings.filter(b => b.bookingType === 'Token' && b.status === 'Completed').length;
+      const completedAppointmentCount = todayBookings.filter(b => b.bookingType === 'Appointment' && b.status === 'Completed').length;
+
       setStatsData({
-        totalTokens: data.length,
-        totalAppointments: 0,
-        completedTokens: data.filter(t => t.status === 'Completed').length,
-        completedAppointments: 0
+        totalTokens: tokenCount,
+        totalAppointments: appointmentCount,
+        completedTokens: completedTokenCount,
+        completedAppointments: completedAppointmentCount
       })
-      
+
       setLoading(false)
     } catch (error) {
-      console.error("Error fetching token data:", error)
+      console.error("Error fetching today's bookings:", error)
       setLoading(false)
+    }
+  }
+
+  // Fetch upcoming bookings (both tokens and appointments for next 7 days)
+  const fetchUpcomingBookings = async () => {
+    try {
+      let upcomingBookings = [];
+      const today = new Date().toISOString().split('T')[0];
+      const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      // Fetch tokens
+      const tokenResponse = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?fromDate=${today}&toDate=${nextWeek}&doctorId=${userId}`)
+      const tokenData = await tokenResponse.json()
+
+      const tokenBookings = tokenData
+        .filter(token => token.date > today) // Exclude today's tokens
+        .map(token => ({
+          id: token.id,
+          patient: token.patientName,
+          time: token.estimatedArrivalTime || 'Not specified',
+          status: token.status,
+          statusId: token.statusId,
+          type: 'Token Consultation',
+          bookingType: 'Token',
+          patientPhone: token.patientPhone,
+          patientGender: token.patientGender,
+          tokenNumber: token.token,
+          date: token.date
+        }))
+
+      upcomingBookings = [...upcomingBookings, ...tokenBookings];
+
+      // Fetch appointments
+      const appointmentResponse = await fetch(`https://api.oneclickhelp.in/api/getAppointmentsByDocIdAndDate?fromDate=${today}&toDate=${nextWeek}&doctorId=${userId}`)
+      const appointmentData = await appointmentResponse.json()
+
+      const appointmentBookings = appointmentData
+        .filter(appointment => appointment.appointmentDate > today) // Exclude today's appointments
+        .map(appointment => ({
+          id: appointment.id,
+          patient: appointment.patientName,
+          time: appointment.appointmentTime || 'Not specified',
+          status: appointment.status,
+          statusId: appointment.statusId,
+          type: 'Appointment',
+          bookingType: 'Appointment',
+          patientPhone: appointment.patientPhone,
+          patientGender: appointment.patientGender,
+          date: appointment.appointmentDate
+        }))
+
+      upcomingBookings = [...upcomingBookings, ...appointmentBookings];
+
+      setAppointmentsUpcoming(upcomingBookings)
+    } catch (error) {
+      console.error("Error fetching upcoming bookings:", error)
     }
   }
 
   const handleDateFilter = async (date) => {
     setSelectedDate(date)
     setAppointmentsLoading(true)
-    
+
     try {
-      const response = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?date=${date}&doctorId=${userId}`)
-      const data = await response.json()
-      
-      const filteredAppointments = data.map(token => ({
+      let filteredBookings = [];
+
+      // Fetch tokens
+      const tokenResponse = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?fromDate=${date}&toDate=${date}&doctorId=${userId}`)
+      const tokenData = await tokenResponse.json()
+
+      const tokenBookings = tokenData.map(token => ({
         id: token.id,
         patient: token.patientName,
         time: token.estimatedArrivalTime || 'Not specified',
@@ -184,22 +263,49 @@ export default function Dashboard() {
         bookingType: 'Token',
         patientPhone: token.patientPhone,
         patientGender: token.patientGender,
-        tokenNumber: token.token
+        tokenNumber: token.token,
+        date: token.date
       }))
-      
-      setAppointmentsToday(filteredAppointments)
-      
+
+      filteredBookings = [...filteredBookings, ...tokenBookings];
+
+      // Fetch appointments
+      const appointmentResponse = await fetch(`https://api.oneclickhelp.in/api/getAppointmentsByDocIdAndDate?fromDate=${date}&toDate=${date}&doctorId=${userId}`)
+      const appointmentData = await appointmentResponse.json()
+
+      const appointmentBookings = appointmentData.map(appointment => ({
+        id: appointment.id,
+        patient: appointment.patientName,
+        time: appointment.appointmentTime || 'Not specified',
+        status: appointment.status,
+        statusId: appointment.statusId,
+        type: 'Appointment',
+        bookingType: 'Appointment',
+        patientPhone: appointment.patientPhone,
+        patientGender: appointment.patientGender,
+        date: appointment.appointmentDate
+      }))
+
+      filteredBookings = [...filteredBookings, ...appointmentBookings];
+
+      setAppointmentsToday(filteredBookings)
+
       // Update stats
+      const tokenCount = filteredBookings.filter(b => b.bookingType === 'Token').length;
+      const appointmentCount = filteredBookings.filter(b => b.bookingType === 'Appointment').length;
+      const completedTokenCount = filteredBookings.filter(b => b.bookingType === 'Token' && b.status === 'Completed').length;
+      const completedAppointmentCount = filteredBookings.filter(b => b.bookingType === 'Appointment' && b.status === 'Completed').length;
+
       setStatsData({
-        totalTokens: data.length,
-        totalAppointments: 0,
-        completedTokens: data.filter(t => t.status === 'Completed').length,
-        completedAppointments: 0
+        totalTokens: tokenCount,
+        totalAppointments: appointmentCount,
+        completedTokens: completedTokenCount,
+        completedAppointments: completedAppointmentCount
       })
-      
+
       setAppointmentsLoading(false)
     } catch (error) {
-      console.error("Error fetching filtered token data:", error)
+      console.error("Error fetching filtered bookings:", error)
       setAppointmentsLoading(false)
     }
   }
@@ -219,13 +325,17 @@ export default function Dashboard() {
           endTime: newSlot.endTime
         })
       })
-      
+
       const result = await response.json()
-      
+
       if (result.status) {
         alert('Slot added successfully!')
-        setShowSlotsModal(false)
-        fetchDoctorSlots()
+        setNewSlot({
+          date: new Date().toISOString().split('T')[0],
+          startTime: "09:00",
+          endTime: "10:00"
+        })
+        fetchDoctorSlots(newSlot.date)
       } else {
         alert('Failed to add slot: ' + result.message)
       }
@@ -238,23 +348,30 @@ export default function Dashboard() {
   // Add a new shift
   const addShift = async () => {
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/addShiftAndMaxPatients', {
+      const response = await fetch('https://api.oneclickhelp.in/api/addDoctorShift', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           doctorId: userId,
-          shiftId: parseInt(newShift.shiftId),
+          shiftName: newShift.shiftName,
+          startTime: newShift.startTime,
+          endTime: newShift.endTime,
           maxAllowedPatients: parseInt(newShift.maxAllowedPatients)
         })
       })
-      
+
       const result = await response.json()
-      
+
       if (result.status) {
         alert('Shift added successfully!')
-        setShowShiftsModal(false)
+        setNewShift({
+          shiftName: "",
+          startTime: "09:00",
+          endTime: "17:00",
+          maxAllowedPatients: 10
+        })
         fetchDoctorShifts()
       } else {
         alert('Failed to add shift: ' + result.message)
@@ -272,9 +389,20 @@ export default function Dashboard() {
   }
 
   // Function to handle status update using the API
-  const updateStatus = async (tokenId, statusId) => {
+  const updateStatus = async (tokenId, statusId, bookingType) => {
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/updateTokenStatus', {
+      let apiUrl = '';
+
+      if (bookingType === 'Token') {
+        apiUrl = 'https://api.oneclickhelp.in/api/updateTokenStatus';
+      } else if (bookingType === 'Appointment') {
+        apiUrl = 'https://api.oneclickhelp.in/api/updateAppointmentStatus';
+      } else {
+        console.error("Unknown booking type");
+        return;
+      }
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -284,29 +412,36 @@ export default function Dashboard() {
           statusId: statusId
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (result.status) {
         // Update the local state to reflect the change
-        setAppointmentsToday(prev => 
-          prev.map(app => 
+        setAppointmentsToday(prev =>
+          prev.map(app =>
             app.id === tokenId ? {
-              ...app, 
+              ...app,
               statusId: statusId,
               status: statusList.find(s => s.statusId === statusId)?.status || app.status
             } : app
           )
         );
-        
+
         // If the status is "Completed", update the stats
         if (statusId === 5) {
-          setStatsData(prev => ({
-            ...prev,
-            completedTokens: prev.completedTokens + 1
-          }));
+          if (bookingType === 'Token') {
+            setStatsData(prev => ({
+              ...prev,
+              completedTokens: prev.completedTokens + 1
+            }));
+          } else {
+            setStatsData(prev => ({
+              ...prev,
+              completedAppointments: prev.completedAppointments + 1
+            }));
+          }
         }
-        
+
         console.log("Status updated successfully");
       } else {
         console.error("Failed to update status");
@@ -328,6 +463,12 @@ export default function Dashboard() {
     fetchDoctorShifts()
   }
 
+  // Handle slot date filter change
+  const handleSlotDateFilter = (date) => {
+    setSlotFilterDate(date)
+    fetchDoctorSlots(date)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -347,7 +488,7 @@ export default function Dashboard() {
                 <Link href="/"> <img src="/logo.png" className="w-30" alt="Company Logo" /></Link>
               </div>
             </div>
-            
+
             <div className="flex items-center">
               <div className="ml-3 relative">
                 <div className="flex items-center space-x-3">
@@ -355,7 +496,7 @@ export default function Dashboard() {
                   <div className="md:hidden text-right cursor-pointer mr-2">
                     <p className="text-sm font-medium text-gray-700">Dr. {userName?.split(' ')[0]}</p>
                   </div>
-                  
+
                   {/* Desktop name display */}
                   <div className="hidden md:block text-right cursor-pointer">
                     <p className="text-sm font-medium text-gray-700">Dr. {userName}</p>
@@ -363,15 +504,15 @@ export default function Dashboard() {
                       {doctorData?.doctorProfDetails?.specialization || 'Doctor'}
                     </p>
                   </div>
-                  
+
                   <div className="relative" ref={dropdownRef}>
-                    <button 
+                    <button
                       onClick={() => setShowDropdown(!showDropdown)}
                       className="h-10 w-10 cursor-pointer rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       {userName ? userName.charAt(0).toUpperCase() : 'D'}
                     </button>
-                    
+
                     {showDropdown && (
                       <div className="origin-top-right cursor-pointer absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
                         <div className="py-1" role="menu" aria-orientation="vertical">
@@ -408,7 +549,7 @@ export default function Dashboard() {
           {/* Management Buttons */}
           <div className="flex flex-wrap gap-4 mb-6">
             {doctorData?.is_appointment && (
-              <button 
+              <button
                 onClick={openSlotsModal}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
               >
@@ -418,9 +559,9 @@ export default function Dashboard() {
                 Manage Slots
               </button>
             )}
-            
+
             {doctorData?.is_token && (
-              <button 
+              <button
                 onClick={openShiftsModal}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center"
               >
@@ -431,7 +572,7 @@ export default function Dashboard() {
               </button>
             )}
           </div>
-          
+
           {/* Stats Section */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white rounded-xl shadow-sm p-6 border border-blue-100">
@@ -447,7 +588,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl shadow-sm p-6 border border-green-100">
               <div className="flex items-center">
                 <div className="rounded-lg bg-green-100 p-3 mr-4">
@@ -461,7 +602,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100">
               <div className="flex items-center">
                 <div className="rounded-lg bg-purple-100 p-3 mr-4">
@@ -475,7 +616,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl shadow-sm p-6 border border-orange-100">
               <div className="flex items-center">
                 <div className="rounded-lg bg-orange-100 p-3 mr-4">
@@ -490,7 +631,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
+
           {/* Appointments Section */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="border-b border-gray-200">
@@ -509,33 +650,38 @@ export default function Dashboard() {
                     Upcoming
                   </button>
                 </nav>
-                
-                {/* Date Filter */}
-                <div className="px-6 py-4 md:py-0">
-                  <label htmlFor="date-filter" className="block text-sm font-medium text-gray-700 mr-2 mb-2 md:mb-0 md:inline-block">
-                    Filter by Date:
-                  </label>
-                  <input
-                    type="date"
-                    id="date-filter"
-                    value={selectedDate}
-                    onChange={(e) => handleDateFilter(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
+
+                {/* Date Filter - Only show for Today's Bookings */}
+                {activeTab === 'today' && (
+                  <div className="px-6 py-4 md:py-0">
+                    <label htmlFor="date-filter" className="block text-sm font-medium text-gray-700 mr-2 mb-2 md:mb-0 md:inline-block">
+                      Filter by Date:
+                    </label>
+                    <input
+                      type="date"
+                      id="date-filter"
+                      value={selectedDate}
+                      onChange={(e) => handleDateFilter(e.target.value)}
+                      className="border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    />
+                  </div>
+                )}
               </div>
             </div>
-            
+
             <div className="p-6">
               <div className="mb-4 flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900">
                   {activeTab === 'today' ? "Today's Bookings" : "Upcoming Bookings"}
                 </h2>
                 <span className="text-sm text-gray-500">
-                  {activeTab === 'today' ? new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Next 7 Days'}
+                  {activeTab === 'today'
+                    ? new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+                    : `Next 7 Days (${new Date().toLocaleDateString()} - ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()})`
+                  }
                 </span>
               </div>
-              
+
               {appointmentsLoading ? (
                 <div className="flex justify-center items-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -548,7 +694,15 @@ export default function Dashboard() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
                       <h3 className="mt-2 text-sm font-medium text-gray-900">No bookings for {new Date(selectedDate).toLocaleDateString()}</h3>
-                      <p className="mt-1 text-sm text-gray-500">Get started by waiting for patients to book tokens.</p>
+                      <p className="mt-1 text-sm text-gray-500">Get started by waiting for patients to book tokens or appointments.</p>
+                    </div>
+                  ) : activeTab === 'upcoming' && appointmentsUpcoming.length === 0 ? (
+                    <div className="text-center py-8">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">No upcoming bookings</h3>
+                      <p className="mt-1 text-sm text-gray-500">No appointments scheduled for the next 7 days.</p>
                     </div>
                   ) : (
                     <div className="overflow-hidden">
@@ -559,14 +713,14 @@ export default function Dashboard() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
                                   <p className="text-sm font-medium text-gray-900 truncate">
-                                    {booking.patient}
+                                    Name : {booking.patient}
                                     <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${booking.bookingType === 'Token' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
                                       {booking.bookingType} {booking.tokenNumber && `#${booking.tokenNumber}`}
                                     </span>
                                   </p>
                                   <div className="flex items-center text-sm text-gray-500">
                                     {booking.date && (
-                                      <span className="mr-2">{booking.date}</span>
+                                      <span className="mr-2">{new Date(booking.date).toLocaleDateString()}</span>
                                     )}
                                     <span>{booking.time}</span>
                                   </div>
@@ -581,27 +735,26 @@ export default function Dashboard() {
                                     </p>
                                   </div>
                                   <div className="flex items-center space-x-2">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                      booking.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                                      booking.status === 'With_Doctor' ? 'bg-blue-100 text-blue-800' : 
-                                      booking.status === 'Waiting' ? 'bg-yellow-100 text-yellow-800' : 
-                                      'bg-gray-100 text-gray-800'
-                                    }`}>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${booking.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                        booking.status === 'With_Doctor' ? 'bg-blue-100 text-blue-800' :
+                                          booking.status === 'Waiting' ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-gray-100 text-gray-800'
+                                      }`}>
                                       {booking.status.replace(/_/g, ' ')}
                                     </span>
-                                    <div className="flex space-x-1">
-                                      {statusList
-                                        .filter(status => status.statusId !== booking.statusId)
-                                        .map(status => (
-                                          <button 
-                                            key={status.statusId}
-                                            onClick={() => updateStatus(booking.id, status.statusId)}
-                                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                                          >
+
+                                    <div className="relative">
+                                      <select
+                                        onChange={(e) => updateStatus(booking.id, parseInt(e.target.value), booking.bookingType)}
+                                        className="block w-full py-1 px-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-xs"
+                                        value={booking.statusId}
+                                      >
+                                        {statusList.map(status => (
+                                          <option key={status.statusId} value={status.statusId}>
                                             {status.status.replace(/_/g, ' ')}
-                                          </button>
-                                        ))
-                                      }
+                                          </option>
+                                        ))}
+                                      </select>
                                     </div>
                                   </div>
                                 </div>
@@ -630,25 +783,36 @@ export default function Dashboard() {
               <h3 className="text-xl font-semibold text-gray-900">
                 Manage Appointment Slots
               </h3>
-              <button 
+              <button
                 onClick={() => setShowSlotsModal(false)}
                 className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
               >
                 <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
                 </svg>
                 <span className="sr-only">Close modal</span>
               </button>
             </div>
-            
+
             <div className="p-4 md:p-5 space-y-4 overflow-y-auto max-h-96">
+              {/* Date filter for slots */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filter Slots by Date</label>
+                <input
+                  type="date"
+                  value={slotFilterDate}
+                  onChange={(e) => handleSlotDateFilter(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                   <input
                     type="date"
                     value={newSlot.date}
-                    onChange={(e) => setNewSlot({...newSlot, date: e.target.value})}
+                    onChange={(e) => setNewSlot({ ...newSlot, date: e.target.value })}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
@@ -657,7 +821,7 @@ export default function Dashboard() {
                   <input
                     type="time"
                     value={newSlot.startTime}
-                    onChange={(e) => setNewSlot({...newSlot, startTime: e.target.value})}
+                    onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
@@ -666,12 +830,12 @@ export default function Dashboard() {
                   <input
                     type="time"
                     value={newSlot.endTime}
-                    onChange={(e) => setNewSlot({...newSlot, endTime: e.target.value})}
+                    onChange={(e) => setNewSlot({ ...newSlot, endTime: e.target.value })}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
               </div>
-              
+
               <button
                 onClick={addSlot}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center justify-center"
@@ -681,9 +845,9 @@ export default function Dashboard() {
                 </svg>
                 Add Slot
               </button>
-              
+
               <div className="mt-6">
-                <h4 className="text-lg font-medium text-gray-900 mb-2">Existing Slots for {newSlot.date}</h4>
+                <h4 className="text-lg font-medium text-gray-900 mb-2">Existing Slots for {new Date(slotFilterDate).toLocaleDateString()}</h4>
                 {doctorSlots.length > 0 ? (
                   <ul className="divide-y divide-gray-200">
                     {doctorSlots.map(slot => (
@@ -694,6 +858,9 @@ export default function Dashboard() {
                             {slot.isBooked ? 'Booked' : 'Available'}
                           </span>
                         </div>
+                        <span className="text-sm text-gray-500">
+                          {new Date(slot.date).toLocaleDateString()}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -714,31 +881,48 @@ export default function Dashboard() {
               <h3 className="text-xl font-semibold text-gray-900">
                 Manage OPD Shifts
               </h3>
-              <button 
+              <button
                 onClick={() => setShowShiftsModal(false)}
                 className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
               >
                 <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
                 </svg>
                 <span className="sr-only">Close modal</span>
               </button>
             </div>
-            
+
             <div className="p-4 md:p-5 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Shift</label>
-                  <select
-                    value={newShift.shiftId}
-                    onChange={(e) => setNewShift({...newShift, shiftId: e.target.value})}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Shift Name</label>
+                  <input
+                    type="text"
+                    value={newShift.shiftName}
+                    onChange={(e) => setNewShift({ ...newShift, shiftName: e.target.value })}
+                    placeholder="e.g., Morning Shift, Evening Shift"
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  >
-                    <option value="">Select a shift</option>
-                    {availableShifts.map(shift => (
-                      <option key={shift.shiftId} value={shift.shiftId}>{shift.shiftName}</option>
-                    ))}
-                  </select>
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input
+                      type="time"
+                      value={newShift.startTime}
+                      onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input
+                      type="time"
+                      value={newShift.endTime}
+                      onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Max Patients</label>
@@ -746,12 +930,12 @@ export default function Dashboard() {
                     type="number"
                     min="1"
                     value={newShift.maxAllowedPatients}
-                    onChange={(e) => setNewShift({...newShift, maxAllowedPatients: e.target.value})}
+                    onChange={(e) => setNewShift({ ...newShift, maxAllowedPatients: e.target.value })}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
               </div>
-              
+
               <button
                 onClick={addShift}
                 className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-md flex items-center justify-center"
@@ -761,7 +945,7 @@ export default function Dashboard() {
                 </svg>
                 Add Shift
               </button>
-              
+
               <div className="mt-6">
                 <h4 className="text-lg font-medium text-gray-900 mb-2">Current Shifts</h4>
                 {doctorShifts.length > 0 ? (
@@ -771,6 +955,9 @@ export default function Dashboard() {
                         <div className="flex justify-between items-center">
                           <span className="font-medium">{shift.shiftName}</span>
                           <span className="text-sm text-gray-500">{shift.startTime} - {shift.endTime}</span>
+                        </div>
+                        <div className="mt-1 text-sm text-gray-500">
+                          Max Patients: {shift.maxAllowedPatients}
                         </div>
                       </li>
                     ))}

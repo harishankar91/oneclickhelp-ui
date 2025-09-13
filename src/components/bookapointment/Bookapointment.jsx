@@ -24,7 +24,7 @@ export default function Bookapointment() {
   const [loadingShifts, setLoadingShifts] = useState(false)
 
   const [patientType, setPatientType] = useState("self")
-  const [paymentOption, setPaymentOption] = useState("clinic")
+  const [paymentOption, setPaymentOption] = useState("online")
   const [formData, setFormData] = useState({
     fullName: "",
     mobile: "",
@@ -59,6 +59,47 @@ export default function Bookapointment() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [authError, setAuthError] = useState("")
+
+  const isWeekOffDay = (dateString) => {
+    if (!doctorData?.weekOff) return false;
+
+    const date = new Date(dateString);
+    const dayOfWeek = date.getDay();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const selectedDay = days[dayOfWeek];
+
+    return selectedDay === doctorData.weekOff;
+  };
+
+  const getMaxDate = () => {
+    if (!doctorData) return null;
+
+    const maxDays = doctorData.is_token
+      ? doctorData.daysToBookToken
+      : doctorData.daysToBookAppointment;
+
+    if (!maxDays) return null;
+
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + maxDays);
+    return maxDate.toISOString().split("T")[0];
+  };
+
+
+  // Add this function to get the next available date
+  const getNextAvailableDate = (dateString) => {
+    if (!doctorData?.weekOff) return dateString;
+
+    let nextDate = new Date(dateString);
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    // Keep adding days until we find a non-weekoff day
+    do {
+      nextDate.setDate(nextDate.getDate() + 1);
+    } while (days[nextDate.getDay()] === doctorData.weekOff);
+
+    return nextDate.toISOString().split("T")[0];
+  };
 
   // Fetch doctor details
   useEffect(() => {
@@ -219,7 +260,7 @@ export default function Bookapointment() {
     try {
       let bookingRes
       let bookingData
-      
+
       if (doctorData.is_token) {
         // Book Token
         bookingRes = await fetch("https://api.oneclickhelp.in/api/bookToken", {
@@ -369,9 +410,31 @@ export default function Bookapointment() {
                 type="date"
                 value={appointmentDate}
                 min={getMinDate()}
-                onChange={(e) => setAppointmentDate(e.target.value)}
+                max={getMaxDate()}
+                onChange={(e) => {
+                  const selectedDate = e.target.value;
+
+                  if (isWeekOffDay(selectedDate)) {
+                    const nextAvailable = getNextAvailableDate(selectedDate);
+                    Swal.fire({
+                      title: "Not Available",
+                      text: `The doctor is not available on ${doctorData.weekOff}s. Would you like to select ${new Date(nextAvailable).toLocaleDateString()} instead?`,
+                      icon: "warning",
+                      showCancelButton: true,
+                      confirmButtonText: "Yes, select this date",
+                      cancelButtonText: "No, let me choose"
+                    }).then((result) => {
+                      if (result.isConfirmed) {
+                        setAppointmentDate(nextAvailable);
+                      }
+                    });
+                  } else {
+                    setAppointmentDate(selectedDate);
+                  }
+                }}
                 className={styles.dateInput}
               />
+
             </div>
 
             {/* Shift Selection */}
@@ -409,7 +472,7 @@ export default function Bookapointment() {
                   ))}
                 </div>
               ) : (
-                <p className="">No {is_token ? "shifts" : "slots"} available</p>
+                <p className="text-red-500 text-sm">No {is_token ? "shifts" : "slots"} found for the selected date. Kindly select a different date.</p>
               )}
             </div>
           </>
@@ -419,7 +482,7 @@ export default function Bookapointment() {
         <div className={styles.doctorSection}>
           <div className={styles.doctorProfile}>
             <img
-              src={`https://api.oneclickhelp.in${photo_url}`}
+              src={photo_url ? `https://api.oneclickhelp.in${photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
               alt={name}
               className={styles.doctorPhoto}
             />
@@ -439,8 +502,8 @@ export default function Bookapointment() {
         </div>
 
         {/* Working Hours Section */}
-        {shifts && shifts.length > 0 && (
-          <div className="mt-8 mb-8 p-6 bg-white rounded-xl shadow-sm border border-gray-100">
+        {shifts && shifts.length > 0 && doctorData.is_token && (
+          <div className="mt-8 mb-8 p-6 bg-white rounded-xl shadow-xl text-center border border-gray-100">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Working Hours</h3>
             <div className="divide-y divide-gray-100">
               {shifts.map((shift, index) => (
@@ -681,7 +744,7 @@ export default function Bookapointment() {
 
           {/* Payment Section - Different for tokens vs appointments */}
           {is_token ? (
-            <div className={styles.tokenPaymentSection}>
+            <div className="text-center">
               <button
                 type="submit"
                 disabled={isSubmitting || !selectedShift}
@@ -689,7 +752,7 @@ export default function Bookapointment() {
               >
                 {isSubmitting
                   ? "Processing..."
-                  : doctorData.is_fess_online
+                  : doctorData.is_fees_online
                     ? `Pay ₹${tokenFees || 10}`
                     : "Book Token"}
               </button>
@@ -697,7 +760,7 @@ export default function Bookapointment() {
 
           ) : (
             <div className={styles.paymentSection}>
-              {doctorData.is_fess_online && (
+              {doctorData.is_fees_online && (
                 <>
                   <h3 className={styles.paymentTitle}>
                     Choose a payment option to Book Appointment
@@ -713,20 +776,20 @@ export default function Bookapointment() {
                       />
                       <div className={styles.paymentDetails}>
                         <div className={styles.paymentPrice}>
-                          <span className={styles.originalPrice}>₹{fees - 50}</span>
-                          <span className={styles.strikePrice}>₹{fees}</span>
-                          <span className={styles.discount}>₹50 OFF*</span>
+                          <span className={styles.originalPrice}>₹{fees}</span>
+                          {/* <span className={styles.strikePrice}>₹{fees}</span> */}
+                          {/* <span className={styles.discount}>₹50 OFF*</span> */}
                         </div>
                         <div className={styles.paymentMethod}>
                           <span>Pay Online</span>
                           <span className={styles.paymentSubtext}>
-                            - Get instant ₹50 off on paying online
+                            - Get hassle free experience
                           </span>
                         </div>
                       </div>
                     </label>
 
-                    <label className={styles.paymentOption}>
+                    {/* <label className={styles.paymentOption}>
                       <input
                         type="radio"
                         name="payment"
@@ -742,7 +805,7 @@ export default function Bookapointment() {
                           <span>Pay later at the clinic</span>
                         </div>
                       </div>
-                    </label>
+                    </label> */}
                   </div>
                 </>
               )}
