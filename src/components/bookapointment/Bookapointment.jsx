@@ -289,7 +289,8 @@ export default function Bookapointment() {
             patientName: patientData.fullName,
             patientPhone: patientData.mobile,
             patientGender: patientData.gender,
-            slotId: selectedShift.id
+            slotId: selectedShift.id,
+            bookedBy: "patient",
           })
         })
         bookingData = await bookingRes.json()
@@ -418,15 +419,12 @@ export default function Bookapointment() {
                     const nextAvailable = getNextAvailableDate(selectedDate);
                     Swal.fire({
                       title: "Not Available",
-                      text: `The doctor is not available on ${doctorData.weekOff}s. Would you like to select ${new Date(nextAvailable).toLocaleDateString()} instead?`,
+                      text: `The doctor is not available on ${doctorData.weekOff}s. Please select another date.`,
                       icon: "warning",
                       showCancelButton: true,
-                      confirmButtonText: "Yes, select this date",
-                      cancelButtonText: "No, let me choose"
+                      confirmButtonText: "Select Next Available",
                     }).then((result) => {
-                      if (result.isConfirmed) {
-                        setAppointmentDate(nextAvailable);
-                      }
+                      setAppointmentDate(today);
                     });
                   } else {
                     setAppointmentDate(selectedDate);

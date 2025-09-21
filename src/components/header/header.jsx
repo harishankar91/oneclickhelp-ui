@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import styles from "./styles/header.module.scss"
@@ -11,6 +11,7 @@ export default function Header() {
   const [userId, setUserId] = useState(null)
   const [roleId, setRoleId] = useState(null)
   const router = useRouter()
+  const dropdownRef = useRef(null)
 
   useEffect(() => {
     const storedUserId = sessionStorage.getItem('userId')
@@ -22,24 +23,33 @@ export default function Header() {
       setUserName(storedUserName)
       setRoleId(storedRoleId)
     }
+    
+    // Add click outside listener
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false)
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
   }, [])
 
   const toggleDropdown = () => {
     setIsDropdownOpen(!isDropdownOpen)
   }
 
-  const closeDropdown = () => {
-    setIsDropdownOpen(false)
-  }
-
   const handleLogout = () => {
+    console.log('Logging out')
     sessionStorage.removeItem('userId')
     sessionStorage.removeItem('userName')
     sessionStorage.removeItem('userRole')
     setUserId(null)
     setUserName(null)
     setRoleId(null)
-    closeDropdown()
+    setIsDropdownOpen(false)
     router.push('/')
   }
 
@@ -53,41 +63,64 @@ export default function Header() {
           </Link>
         </div>
 
-        <div className={styles.userSection}>
+        <div className={styles.userSection} ref={dropdownRef}>
           <div className={styles.userActions}>
-            <Link
-              className={styles.doctorLoginButton}
-              href="/doctor/login">
-              For Doctor
-            </Link>
 
             {userName ? (
-            <button
-              className={styles.userButton}
-              onClick={toggleDropdown}
-              onBlur={() => setTimeout(closeDropdown, 150)}
-            >
-              <span className={styles.userName}>
-                {userName}
-              </span>
-            </button>
+              <>
+
+                {roleId === '2' ? (
+                  <Link
+                    className={styles.doctorLoginButton}
+                    href="/login"
+                  >
+                    For Patient
+                  </Link>
+                ) : (
+                  <Link
+                    className={styles.doctorLoginButton}
+                    href="/doctor/login"
+                  >
+                    For Doctor
+                  </Link>
+                )}
+
+                <button
+                  className={styles.userButton}
+                  onClick={toggleDropdown}
+                >
+                  <span className={styles.userName}>
+                    {userName}
+                  </span>
+                </button>
+              </>
             ) : (
-            <Link href="/login"
-              className={styles.userButton}
-              onBlur={() => setTimeout(closeDropdown, 150)}
-            >
-              <span className={styles.userName}>
-                For Patient
-              </span>
-            </Link>
+              <>
+                <Link
+                  className={styles.doctorLoginButton}
+                  href="/doctor/login"
+                >
+                  For Doctor
+                </Link>
+
+                <Link
+                  href="/login"
+                  className={styles.userButton}
+                >
+                  <span className={styles.userName}>
+                    For Patient
+                  </span>
+                </Link>
+              </>
             )}
+
           </div>
 
           {isDropdownOpen && (
             <div className={styles.dropdown}>
               {userId ? (
                 <>
-                  <Link href={roleId == '2' ? "/doctor/dashboard" : "/user/dashboard"} className={styles.dropdownItem} onClick={closeDropdown}>
+                  <Link href={roleId == '2' ? "/doctor/dashboard" : "/user/dashboard"} className={styles.dropdownItem}>
                     View Dashboard
                   </Link>
                   <button className={styles.dropdownItem} onClick={handleLogout}>
@@ -95,7 +128,7 @@ export default function Header() {
                   </button>
                 </>
               ) : (
-                <Link href="/" className={styles.dropdownItem} onClick={closeDropdown}>
+                <Link href="/" className={styles.dropdownItem}>
                   My Appointment
                 </Link>
               )}

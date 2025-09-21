@@ -14,15 +14,15 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState(null)
   const [filterStatus, setFilterStatus] = useState("all")
-  const [doctorDetails, setDoctorDetails] = useState({}) // Store doctor details by ID
-  const [statusList, setStatusList] = useState([]) // Store token status list
-  const [liveStatus, setLiveStatus] = useState(null) // Store live status data
-  const [showLiveStatus, setShowLiveStatus] = useState(false) // Control popup visibility
-  const [loadingLiveStatus, setLoadingLiveStatus] = useState(false) // Loading state for live status
-  const [dateFilter, setDateFilter] = useState("") // Date filter for both tokens and appointments
+  const [doctorDetails, setDoctorDetails] = useState({})
+  const [statusList, setStatusList] = useState([])
+  const [liveStatus, setLiveStatus] = useState(null)
+  const [showLiveStatus, setShowLiveStatus] = useState(false)
+  const [loadingLiveStatus, setLoadingLiveStatus] = useState(false)
+  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0])
+  const [isCurrentDate, setIsCurrentDate] = useState(true)
 
   useEffect(() => {
-    // Check if user is logged in
     const userId = sessionStorage.getItem('userId')
     const userName = sessionStorage.getItem('userName')
 
@@ -36,6 +36,12 @@ export default function Dashboard() {
       fetchUserData(userId)
     })
   }, [router])
+
+  useEffect(() => {
+    // Check if the selected date is the current date
+    const today = new Date().toISOString().split('T')[0]
+    setIsCurrentDate(dateFilter === today)
+  }, [dateFilter])
 
   const fetchLiveStatus = async (doctorId, tokenId) => {
     setLoadingLiveStatus(true)
@@ -119,7 +125,6 @@ export default function Dashboard() {
           const appointmentDoctorDetailsMap = {};
 
           for (const doctorId of appointmentDoctorIds) {
-            // Only fetch if we haven't already fetched this doctor's details
             if (!doctorDetails[doctorId]) {
               const details = await fetchDoctorDetails(doctorId);
               if (details) {
@@ -157,8 +162,6 @@ export default function Dashboard() {
   }
 
   const getStatusBadge = (statusId, isAppointment = false) => {
-
-    // For tokens, use the status list from API
     const statusInfo = statusList.find(status => status.status === statusId);
 
     if (statusInfo) {
@@ -181,7 +184,6 @@ export default function Dashboard() {
       )
     }
 
-    // Default badge if status not found
     return (
       <span className="px-3 py-1 rounded-full text-xs font-medium border bg-gray-100 text-gray-800 border-gray-200">
         Unknown
@@ -195,20 +197,17 @@ export default function Dashboard() {
     router.push('/')
   }
 
-  // Filter tokens by status and date
   const filteredTokens = tokens.filter(token => {
-    const statusMatch = filterStatus === "all" || 
+    const statusMatch = filterStatus === "all" ||
       (token.statusId && token.statusId.toString() === filterStatus);
-    
-    const dateMatch = !dateFilter || 
+
+    const dateMatch = !dateFilter ||
       (token.bookingDate && token.bookingDate.split('T')[0] === dateFilter);
-    
+
     return statusMatch && dateMatch;
   });
 
-  // Filter appointments by status and date
   const filteredAppointments = appointments.filter(appointment => {
-    // For appointments, we need to map the status string to a filter value
     let statusMatch = false;
     if (filterStatus === "all") {
       statusMatch = true;
@@ -219,10 +218,10 @@ export default function Dashboard() {
     } else if (filterStatus === "3") {
       statusMatch = appointment.status === "Cancelled";
     }
-    
-    const dateMatch = !dateFilter || 
+
+    const dateMatch = !dateFilter ||
       (appointment.bookingDate && appointment.bookingDate.split('T')[0] === dateFilter);
-    
+
     return statusMatch && dateMatch;
   });
 
@@ -240,9 +239,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Card */}
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl shadow-lg p-6 text-white mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
@@ -262,14 +259,13 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Tabs and Filters */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div className="flex border-b border-gray-200 md:border-none overflow-x-auto">
               <button
                 className={`px-6 py-3 cursor-pointer text-sm font-medium rounded-t-lg md:rounded-lg transition-colors duration-200 flex-shrink-0 ${activeTab === 'tokens'
-                    ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600 md:border-none'
-                    : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600 md:border-none'
+                  : 'text-gray-500 hover:text-gray-700'
                   }`}
                 onClick={() => setActiveTab('tokens')}
               >
@@ -282,8 +278,8 @@ export default function Dashboard() {
               </button>
               <button
                 className={`px-6 py-3 cursor-pointer text-sm font-medium rounded-t-lg md:rounded-lg transition-colors duration-200 flex-shrink-0 ${activeTab === 'appointments'
-                    ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600 md:border-none'
-                    : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600 md:border-none'
+                  : 'text-gray-500 hover:text-gray-700'
                   }`}
                 onClick={() => setActiveTab('appointments')}
               >
@@ -329,7 +325,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Content */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           {activeTab === 'tokens' ? (
             <div className="p-6">
@@ -349,8 +344,8 @@ export default function Dashboard() {
                   </div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">No tokens found</h3>
                   <p className="text-gray-600 mb-6">
-                    {dateFilter || filterStatus !== "all" 
-                      ? "No tokens match your filters. Try changing your filter criteria." 
+                    {dateFilter || filterStatus !== "all"
+                      ? "No tokens match your filters. Try changing your filter criteria."
                       : "You haven't booked any tokens yet."}
                   </p>
                 </div>
@@ -358,13 +353,16 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredTokens.map((token) => {
                     const doctor = doctorDetails[token.doctorId];
+                    // Check if token booking date is today
+                    const isTokenToday = token.bookingDate && 
+                      token.bookingDate.split('T')[0] === new Date().toISOString().split('T')[0];
+                    
                     return (
                       <div key={token.id} className="border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all duration-200 relative bg-white">
                         <div className="absolute top-5 right-5">
                           {getStatusBadge(token.status)}
                         </div>
 
-                        {/* Token Header */}
                         <div className="flex items-center mb-5 pb-4 border-b border-gray-100">
                           <div className="bg-blue-100 p-3 rounded-lg mr-4">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -375,39 +373,37 @@ export default function Dashboard() {
                             <div className="text-2xl font-bold text-blue-600">
                               Token #{token.token}
                             </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              Booking ID: {token.id}
-                            </div>
                           </div>
                         </div>
 
-                        {/* Live Status Button */}
-                        <div className="mb-4">
-                          <button
-                            onClick={() => fetchLiveStatus(token.doctorId, token.token)}
-                            disabled={loadingLiveStatus}
-                            className="w-full bg-green-100 hover:bg-green-200 text-green-800 py-2 px-4 rounded-md flex items-center justify-center transition-colors duration-200"
-                          >
-                            {loadingLiveStatus ? (
-                              <>
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-green-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Loading Status...
-                              </>
-                            ) : (
-                              <>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                </svg>
-                                Check Live Status
-                              </>
-                            )}
-                          </button>
-                        </div>
+                        {/* Only show Check Live Status button if token is for today */}
+                        {isTokenToday && (
+                          <div className="mb-4">
+                            <button
+                              onClick={() => fetchLiveStatus(token.doctorId, token.token)}
+                              disabled={loadingLiveStatus}
+                              className="w-full bg-green-100 hover:bg-green-200 text-green-800 py-2 px-4 rounded-md flex items-center justify-center transition-colors duration-200"
+                            >
+                              {loadingLiveStatus ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-green-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Loading Status...
+                                </>
+                              ) : (
+                                <>
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                  </svg>
+                                  Check Live Status
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
 
-                        {/* Patient Information */}
                         <div className="mb-6">
                           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -439,15 +435,14 @@ export default function Dashboard() {
                             </div>
 
                             <div className="flex">
-                                <span className="text-sm text-gray-600 w-32 flex-shrink-0">Arrival Time:</span>
-                                <span className="text-sm font-medium text-gray-900">
-                                  {token.estimatedArrivalTime || "Not specified"}
-                                </span>
-                              </div>
+                              <span className="text-sm text-gray-600 w-32 flex-shrink-0">Arrival Time:</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                {token.estimatedArrivalTime || "Not specified"}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Doctor Information */}
                         {doctor && (
                           <div className="mb-6">
                             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
@@ -462,10 +457,6 @@ export default function Dashboard() {
                                 <span className="text-sm font-medium text-gray-900">{token.doctorName}</span>
                               </div>
                               <div className="flex">
-                                <span className="text-sm text-gray-600 w-32 flex-shrink-0">Phone:</span>
-                                <span className="text-sm font-medium text-gray-900">{doctor.phone || "Not available"}</span>
-                              </div>
-                              <div className="flex">
                                 <span className="text-sm text-gray-600 w-32 flex-shrink-0">Specialization:</span>
                                 <span className="text-sm font-medium text-gray-900">{doctor.doctorProfDetails.specialization || "Not specified"}</span>
                               </div>
@@ -473,7 +464,6 @@ export default function Dashboard() {
                           </div>
                         )}
 
-                        {/* Hospital Information */}
                         {doctor && doctor.hospitalDetails && (
                           <div>
                             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
@@ -489,7 +479,14 @@ export default function Dashboard() {
                                   {token.hospitalName || "Not specified"}
                                 </span>
                               </div>
-                              
+
+                              <div className="flex">
+                                <span className="text-sm text-gray-600 w-32 flex-shrink-0">Phone:</span>
+                                <span className="text-sm font-medium text-gray-900">
+                                  {doctor.hospitalDetails.phone_1 || doctor.hospitalDetails.phone_2 || doctor.hospitalDetails.landline || "NA"}
+                                </span>
+
+                              </div>
                               <div className="flex">
                                 <span className="text-sm text-gray-600 w-32 flex-shrink-0">Address:</span>
                                 <span className="text-sm font-medium text-gray-900">
@@ -500,79 +497,87 @@ export default function Dashboard() {
                             </div>
                           </div>
                         )}
+
+                        {/* Only show action buttons if token is for today */}
+                        {isTokenToday && (
+                          <div className="mt-6 flex space-x-3">
+                           
+                            <button className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 py-2 px-4 rounded-md transition-colors duration-200">
+                              Reschedule
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
 
-                {showLiveStatus && (
-                  <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-                    {/* Blurry Background */}
-                    <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm" onClick={closeLiveStatus}></div>
-                    
-                    {/* Popup Content */}
-                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative z-10">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xl font-bold text-gray-800">Live Token Status</h3>
-                        <button onClick={closeLiveStatus} className="text-gray-500 hover:text-gray-700">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
+                  {showLiveStatus && (
+                    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+                      <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm" onClick={closeLiveStatus}></div>
 
-                      {liveStatus ? (
-                        <div className="space-y-4">
-                          <div className="bg-blue-50 p-4 rounded-lg">
-                            <h4 className="font-semibold text-blue-800 mb-2">Doctor: {liveStatus.doctorName}</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="bg-white p-3 rounded-md shadow-sm">
-                                <p className="text-sm text-gray-600">Current Token</p>
-                                <p className="text-2xl font-bold text-blue-600">{liveStatus.currentToken}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-md shadow-sm">
-                                <p className="text-sm text-gray-600">Your Token</p>
-                                <p className="text-2xl font-bold text-green-600">{liveStatus.yourToken}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-md shadow-sm">
-                                <p className="text-sm text-gray-600">Waiting Patients</p>
-                                <p className="text-2xl font-bold text-orange-600">{liveStatus.waitingPatients}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-md shadow-sm">
-                                <p className="text-sm text-gray-600">Estimated Time</p>
-                                <p className="text-2xl font-bold text-purple-600">{liveStatus.estimatedTime} min</p>
+                      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative z-10">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-xl font-bold text-gray-800">Live Token Status</h3>
+                          <button onClick={closeLiveStatus} className="text-gray-500 hover:text-gray-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        {liveStatus ? (
+                          <div className="space-y-4">
+                            <div className="bg-blue-50 p-4 rounded-lg">
+                              <h4 className="font-semibold text-blue-800 mb-2">Doctor: {liveStatus.doctorName}</h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white p-3 rounded-md shadow-sm">
+                                  <p className="text-sm text-gray-600">Current Token</p>
+                                  <p className="text-2xl font-bold text-blue-600">{liveStatus.currentToken}</p>
+                                </div>
+                                <div className="bg-white p-3 rounded-md shadow-sm">
+                                  <p className="text-sm text-gray-600">Your Token</p>
+                                  <p className="text-2xl font-bold text-green-600">{liveStatus.yourToken}</p>
+                                </div>
+                                <div className="bg-white p-3 rounded-md shadow-sm">
+                                  <p className="text-sm text-gray-600">Waiting Patients</p>
+                                  <p className="text-2xl font-bold text-orange-600">{liveStatus.waitingPatients}</p>
+                                </div>
+                                <div className="bg-white p-3 rounded-md shadow-sm">
+                                  <p className="text-sm text-gray-600">Estimated Time</p>
+                                  <p className="text-2xl font-bold text-purple-600">{liveStatus.estimatedTime} min</p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          
-                          <div className="bg-gray-100 p-4 rounded-lg">
-                            <h4 className="font-semibold text-gray-800 mb-2">Status Summary</h4>
-                            <p className="text-gray-600">
-                              {liveStatus.yourToken === liveStatus.currentToken 
-                                ? "It's your turn now! Please proceed to the doctor's room."
-                                : liveStatus.yourToken > liveStatus.currentToken
-                                ? `There are ${liveStatus.waitingPatients} patients ahead of you. Estimated wait time is ${liveStatus.estimatedTime} minutes.`
-                                : "Your token has already been processed."}
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                          <p className="text-gray-600">Loading status information...</p>
-                        </div>
-                      )}
 
-                      <div className="mt-6 flex justify-end">
-                        <button
-                          onClick={closeLiveStatus}
-                          className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors duration-200"
-                        >
-                          Close
-                        </button>
+                            <div className="bg-gray-100 p-4 rounded-lg">
+                              <h4 className="font-semibold text-gray-800 mb-2">Status Summary</h4>
+                              <p className="text-gray-600">
+                                {liveStatus.yourToken === liveStatus.currentToken
+                                  ? "It's your turn now! Please proceed to the doctor's room."
+                                  : liveStatus.yourToken > liveStatus.currentToken
+                                    ? `There are ${liveStatus.waitingPatients} patients ahead of you. Estimated wait time is ${liveStatus.estimatedTime} minutes.`
+                                    : "Your token has already been processed."}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                            <p className="text-gray-600">Loading status information...</p>
+                          </div>
+                        )}
+
+                        <div className="mt-6 flex justify-end">
+                          <button
+                            onClick={closeLiveStatus}
+                            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors duration-200"
+                          >
+                            Close
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
                 </div>
               )}
             </div>
@@ -594,8 +599,8 @@ export default function Dashboard() {
                   </div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">No appointments found</h3>
                   <p className="text-gray-600 mb-6">
-                    {dateFilter || filterStatus !== "all" 
-                      ? "No appointments match your filters. Try changing your filter criteria." 
+                    {dateFilter || filterStatus !== "all"
+                      ? "No appointments match your filters. Try changing your filter criteria."
                       : "You haven't booked any appointments yet."}
                   </p>
                 </div>
@@ -609,7 +614,6 @@ export default function Dashboard() {
                           {getStatusBadge(appointment.status, true)}
                         </div>
 
-                        {/* Appointment Header */}
                         <div className="flex items-center mb-5 pb-4 border-b border-gray-100">
                           <div className="bg-purple-100 p-3 rounded-lg mr-4">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -626,7 +630,6 @@ export default function Dashboard() {
                           </div>
                         </div>
 
-                        {/* Patient Information */}
                         <div className="mb-5">
                           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Patient Details</h3>
                           <div className="space-y-2.5 pl-2">
@@ -646,10 +649,13 @@ export default function Dashboard() {
                               <span className="text-sm text-gray-600 w-28 flex-shrink-0">Booking Date:</span>
                               <span className="text-sm font-medium text-gray-900">{formatDate(appointment.bookingDate)}</span>
                             </div>
+                            <div className="flex">
+                              <span className="text-sm text-gray-600 w-28 flex-shrink-0">Slot:</span>
+                              <span className="text-sm font-medium text-gray-900">{appointment.slotStartTime} - {appointment.slotEndTime}</span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Doctor Information */}
                         {doctor && (
                           <div className="mb-6">
                             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Doctor Details</h3>
@@ -666,7 +672,6 @@ export default function Dashboard() {
                           </div>
                         )}
 
-                        {/* Hospital Information */}
                         <div className="mb-6">
                           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Hospital Details</h3>
                           <div className="space-y-2.5 pl-2">
@@ -681,8 +686,21 @@ export default function Dashboard() {
                                   .filter(Boolean).join(", ") || "Not available"}
                               </span>
                             </div>
+                            <div className="flex">
+                              <span className="text-sm text-gray-600 w-28 flex-shrink-0">Phone:</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                {doctor.hospitalDetails.phone_1 || doctor.hospitalDetails.phone_2 || doctor.hospitalDetails.landline || "NA"}
+                              </span>
+                            </div>
+                            <div className="flex">
+                              <span className="text-sm text-gray-600 w-28 flex-shrink-0">Email:</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                {doctor.hospitalDetails.email || "NA"}
+                              </span>
+                            </div>
                           </div>
                         </div>
+
                       </div>
                     )
                   })}

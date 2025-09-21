@@ -23,18 +23,22 @@ export default function Dashboard() {
   const [showSlotsModal, setShowSlotsModal] = useState(false)
   const [showShiftsModal, setShowShiftsModal] = useState(false)
   const [doctorSlots, setDoctorSlots] = useState([])
+
   const [doctorShifts, setDoctorShifts] = useState([])
+  const [newShift, setNewShift] = useState({
+    shiftId: "",
+    startTime: "09:00",
+    endTime: "17:00",
+    maxAllowedPatients: 10
+  })
+  const [availableShifts, setAvailableShifts] = useState([]) // Add this state for available shifts
+
   const [newSlot, setNewSlot] = useState({
     date: new Date().toISOString().split('T')[0],
     startTime: "09:00",
     endTime: "10:00"
   })
-  const [newShift, setNewShift] = useState({
-    shiftName: "",
-    startTime: "09:00",
-    endTime: "17:00",
-    maxAllowedPatients: 10
-  })
+
   const [slotFilterDate, setSlotFilterDate] = useState(new Date().toISOString().split('T')[0])
 
   const dropdownRef = useRef(null)
@@ -54,6 +58,7 @@ export default function Dashboard() {
     fetchStatusList()
     fetchTodayBookings()
     fetchUpcomingBookings()
+    fetchAvailableShifts()
 
     // Add event listener to close dropdown when clicking outside
     document.addEventListener('mousedown', handleClickOutside)
@@ -67,6 +72,21 @@ export default function Dashboard() {
   const handleClickOutside = (event) => {
     if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
       setShowDropdown(false)
+    }
+  }
+
+  const fetchAvailableShifts = async () => {
+    try {
+      const response = await fetch('https://api.oneclickhelp.in/api/getOPDShiftDetails')
+      const data = await response.json()
+      if (data.status) {
+        setAvailableShifts(data.data)
+      } else {
+        setAvailableShifts([])
+      }
+    } catch (error) {
+      console.error("Error fetching available shifts:", error)
+      setAvailableShifts([])
     }
   }
 
@@ -140,6 +160,7 @@ export default function Dashboard() {
         patientPhone: token.patientPhone,
         patientGender: token.patientGender,
         tokenNumber: token.token,
+        shiftOrSlot: token.shiftName,
         date: token.date
       }))
 
@@ -159,6 +180,7 @@ export default function Dashboard() {
         bookingType: 'Appointment',
         patientPhone: appointment.patientPhone,
         patientGender: appointment.patientGender,
+        shiftOrSlot: appointment.slotStartTime + '-' + appointment.slotEndTime,
         date: appointment.appointmentDate
       }))
 
@@ -198,7 +220,7 @@ export default function Dashboard() {
       const tokenData = await tokenResponse.json()
 
       const tokenBookings = tokenData
-        .filter(token => token.date > today) // Exclude today's tokens
+        .filter(token => token.bookingDate > today) // Exclude today's tokens
         .map(token => ({
           id: token.id,
           patient: token.patientName,
@@ -210,7 +232,8 @@ export default function Dashboard() {
           patientPhone: token.patientPhone,
           patientGender: token.patientGender,
           tokenNumber: token.token,
-          date: token.date
+          shiftOrSlot: token.shiftName,
+          date: token.bookingDate
         }))
 
       upcomingBookings = [...upcomingBookings, ...tokenBookings];
@@ -220,7 +243,7 @@ export default function Dashboard() {
       const appointmentData = await appointmentResponse.json()
 
       const appointmentBookings = appointmentData
-        .filter(appointment => appointment.appointmentDate > today) // Exclude today's appointments
+        .filter(appointment => appointment.bookingDate > today) // Exclude today's appointments
         .map(appointment => ({
           id: appointment.id,
           patient: appointment.patientName,
@@ -231,7 +254,8 @@ export default function Dashboard() {
           bookingType: 'Appointment',
           patientPhone: appointment.patientPhone,
           patientGender: appointment.patientGender,
-          date: appointment.appointmentDate
+          shiftOrSlot: appointment.slotStartTime + '-' + appointment.slotEndTime,
+          date: appointment.bookingDate
         }))
 
       upcomingBookings = [...upcomingBookings, ...appointmentBookings];
@@ -264,6 +288,7 @@ export default function Dashboard() {
         patientPhone: token.patientPhone,
         patientGender: token.patientGender,
         tokenNumber: token.token,
+        shiftOrSlot: token.shiftName,
         date: token.date
       }))
 
@@ -283,6 +308,7 @@ export default function Dashboard() {
         bookingType: 'Appointment',
         patientPhone: appointment.patientPhone,
         patientGender: appointment.patientGender,
+        shiftOrSlot: appointment.slotStartTime + '-' + appointment.slotEndTime,
         date: appointment.appointmentDate
       }))
 
@@ -329,7 +355,7 @@ export default function Dashboard() {
       const result = await response.json()
 
       if (result.status) {
-        alert('Slot added successfully!')
+        alert(result.message || 'Slot added successfully!')
         setNewSlot({
           date: new Date().toISOString().split('T')[0],
           startTime: "09:00",
@@ -348,14 +374,14 @@ export default function Dashboard() {
   // Add a new shift
   const addShift = async () => {
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/addDoctorShift', {
+      const response = await fetch('https://api.oneclickhelp.in/api/addShiftAndMaxPatients', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           doctorId: userId,
-          shiftName: newShift.shiftName,
+          shiftId: parseInt(newShift.shiftId),
           startTime: newShift.startTime,
           endTime: newShift.endTime,
           maxAllowedPatients: parseInt(newShift.maxAllowedPatients)
@@ -367,7 +393,7 @@ export default function Dashboard() {
       if (result.status) {
         alert('Shift added successfully!')
         setNewShift({
-          shiftName: "",
+          shiftId: "",
           startTime: "09:00",
           endTime: "17:00",
           maxAllowedPatients: 10
@@ -510,7 +536,11 @@ export default function Dashboard() {
                       onClick={() => setShowDropdown(!showDropdown)}
                       className="h-10 w-10 cursor-pointer rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
-                      {userName ? userName.charAt(0).toUpperCase() : 'D'}
+                      <img
+              src={doctorData?.photo_url ? `https://api.oneclickhelp.in${doctorData?.photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
+
+              className="h-10 w-10 rounded-full object-cover"
+            />
                     </button>
 
                     {showDropdown && (
@@ -520,6 +550,20 @@ export default function Dashboard() {
                             <p className="font-medium">Dr. {userName}</p>
                             <p className="text-xs text-gray-500">{doctorData?.doctorProfDetails?.specialization || 'Doctor'}</p>
                           </div>
+
+                          <button
+                            onClick={() => router.push(`/doctor/upload-photo/${doctorData?.doctorId}`)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          >
+                            <span className="flex cursor-pointer items-center">
+
+                              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                              </svg>
+                              Upload Photo
+                            </span>
+                          </button>
+
                           <button
                             onClick={handleLogout}
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
@@ -571,6 +615,16 @@ export default function Dashboard() {
                 Manage Shifts
               </button>
             )}
+
+            <Link
+              href={`/doctor/book/${doctorData?.doctorId}`}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              Book {doctorData?.is_appointment && doctorData?.is_token ? 'Token/Appointment' : doctorData?.is_appointment ? 'Appointment' : 'Token'}
+            </Link>
           </div>
 
           {/* Stats Section */}
@@ -705,59 +759,103 @@ export default function Dashboard() {
                       <p className="mt-1 text-sm text-gray-500">No appointments scheduled for the next 7 days.</p>
                     </div>
                   ) : (
-                    <div className="overflow-hidden">
+                    <div className="overflow-hidden bg-white rounded-lg shadow">
                       <ul className="divide-y divide-gray-200">
                         {(activeTab === 'today' ? appointmentsToday : appointmentsUpcoming).map((booking) => (
-                          <li key={booking.id} className="py-4">
-                            <div className="flex space-x-3">
+                          <li key={booking.id} className="py-5 px-4 hover:bg-gray-50 transition-colors duration-150">
+                            <div className="flex space-x-4">
+                              <div className="flex-shrink-0">
+                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                  <span className="text-blue-600 font-medium">
+                                    {booking.patient.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              </div>
+
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
-                                  <p className="text-sm font-medium text-gray-900 truncate">
-                                    Name : {booking.patient}
-                                    <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${booking.bookingType === 'Token' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                                  <div className="flex items-center">
+                                    <p className="text-md font-semibold text-gray-900">
+                                      {booking.patient}
+                                    </p>
+                                    <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${booking.bookingType === 'Token' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
                                       {booking.bookingType} {booking.tokenNumber && `#${booking.tokenNumber}`}
                                     </span>
-                                  </p>
+                                  </div>
                                   <div className="flex items-center text-sm text-gray-500">
                                     {booking.date && (
-                                      <span className="mr-2">{new Date(booking.date).toLocaleDateString()}</span>
+                                      <span className="mr-2 flex items-center">
+                                        <svg className="mr-1 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        {new Date(booking.date).toLocaleDateString()}
+                                      </span>
                                     )}
-                                    <span>{booking.time}</span>
+                                    <span className="flex items-center">
+                                      <svg className="mr-1 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      {booking.shiftOrSlot}
+                                    </span>
                                   </div>
                                 </div>
-                                <div className="mt-1 flex items-center justify-between">
+
+                                <div className="mt-2 flex items-center justify-between">
                                   <div>
-                                    <p className="text-sm text-gray-500 truncate">
+                                    <p className="text-sm text-gray-600">
                                       {booking.type}
                                     </p>
-                                    <p className="text-xs text-gray-400">
-                                      {booking.patientGender} • {booking.patientPhone}
+                                    <p className="text-xs text-gray-500 mt-1 flex items-center">
+                                      <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                      </svg>
+                                      {booking.patientGender}
+                                      <svg className="mx-2 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                      </svg>
+                                      <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                      </svg>
+                                      {booking.patientPhone}
                                     </p>
                                   </div>
-                                  <div className="flex items-center space-x-2">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${booking.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                        booking.status === 'With_Doctor' ? 'bg-blue-100 text-blue-800' :
-                                          booking.status === 'Waiting' ? 'bg-yellow-100 text-yellow-800' :
-                                            'bg-gray-100 text-gray-800'
-                                      }`}>
-                                      {booking.status.replace(/_/g, ' ')}
-                                    </span>
 
-                                    <div className="relative">
-                                      <select
-                                        onChange={(e) => updateStatus(booking.id, parseInt(e.target.value), booking.bookingType)}
-                                        className="block w-full py-1 px-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-xs"
-                                        value={booking.statusId}
+                                  {activeTab === 'today' && selectedDate === new Date().toISOString().split('T')[0] && (
+                                    <div className="flex items-center space-x-3">
+                                      <span
+                                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                          booking.status === 'Completed'
+                                            ? 'bg-green-100 text-green-800'
+                                            : booking.status === 'With_Doctor'
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : booking.status === 'Waiting'
+                                            ? 'bg-yellow-100 text-yellow-800'
+                                            : 'bg-gray-100 text-gray-800'
+                                        }`}
                                       >
-                                        {statusList.map(status => (
-                                          <option key={status.statusId} value={status.statusId}>
-                                            {status.status.replace(/_/g, ' ')}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        {booking.status.replace(/_/g, ' ')}
+                                      </span>
+
+                                      <div className="relative">
+                                        <select
+                                          onChange={(e) =>
+                                            updateStatus(booking.id, parseInt(e.target.value), booking.bookingType)
+                                          }
+                                          className="block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-xs"
+                                          value={booking.statusId}
+                                        >
+                                          {statusList.map((status) => (
+                                            <option key={status.statusId} value={status.statusId}>
+                                              {status.status.replace(/_/g, ' ')}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
                                     </div>
-                                  </div>
+                                  )}
+
                                 </div>
+
                               </div>
                             </div>
                           </li>
@@ -777,22 +875,21 @@ export default function Dashboard() {
 
       {/* Slots Modal */}
       {showSlotsModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg lg:max-w-2xl">
-            <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
-              <h3 className="text-xl font-semibold text-gray-900">
-                Manage Appointment Slots
-              </h3>
-              <button
-                onClick={() => setShowSlotsModal(false)}
-                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
-              >
-                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
-                </svg>
-                <span className="sr-only">Close modal</span>
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg lg:max-w-2xl animate-scale-in"> <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+            <h3 className="text-xl font-semibold text-gray-900">
+              Manage Appointment Slots
+            </h3>
+            <button
+              onClick={() => setShowSlotsModal(false)}
+              className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
+            >
+              <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+              </svg>
+              <span className="sr-only">Close modal</span>
+            </button>
+          </div>
 
             <div className="p-4 md:p-5 space-y-4 overflow-y-auto max-h-96">
               {/* Date filter for slots */}
@@ -853,14 +950,14 @@ export default function Dashboard() {
                     {doctorSlots.map(slot => (
                       <li key={slot.id} className="py-3 flex justify-between items-center">
                         <div>
-                          <span className="font-medium">{slot.startTime} - {slot.endTime}</span>
+                          <span className="font-medium">Time - {slot.startTime} - {slot.endTime}</span>
                           <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${slot.isBooked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                             {slot.isBooked ? 'Booked' : 'Available'}
                           </span>
                         </div>
-                        <span className="text-sm text-gray-500">
-                          {new Date(slot.date).toLocaleDateString()}
-                        </span>
+                        {/* <span className="text-sm text-gray-500">
+                          {new Date(slot.slotDate).toLocaleDateString()}
+                        </span> */}
                       </li>
                     ))}
                   </ul>
@@ -875,34 +972,38 @@ export default function Dashboard() {
 
       {/* Shifts Modal */}
       {showShiftsModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg">
-            <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
-              <h3 className="text-xl font-semibold text-gray-900">
-                Manage OPD Shifts
-              </h3>
-              <button
-                onClick={() => setShowShiftsModal(false)}
-                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
-              >
-                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
-                </svg>
-                <span className="sr-only">Close modal</span>
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg animate-scale-in">  <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+            <h3 className="text-xl font-semibold text-gray-900">
+              Manage OPD Shifts
+            </h3>
+            <button
+              onClick={() => setShowShiftsModal(false)}
+              className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
+            >
+              <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+              </svg>
+              <span className="sr-only">Close modal</span>
+            </button>
+          </div>
 
             <div className="p-4 md:p-5 space-y-4">
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Shift Name</label>
-                  <input
-                    type="text"
-                    value={newShift.shiftName}
-                    onChange={(e) => setNewShift({ ...newShift, shiftName: e.target.value })}
-                    placeholder="e.g., Morning Shift, Evening Shift"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Shift</label>
+                  <select
+                    value={newShift.shiftId}
+                    onChange={(e) => setNewShift({ ...newShift, shiftId: e.target.value })}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
+                  >
+                    <option value="">Select a shift</option>
+                    {availableShifts.map(shift => (
+                      <option key={shift.shiftId} value={shift.shiftId}>
+                        {shift.shiftName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
