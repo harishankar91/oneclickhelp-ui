@@ -14,6 +14,20 @@ export default function Bookapointment() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [authToken, setAuthToken] = useState(null)
   const router = useRouter()
+  
+  // OTP verification states
+  const [otpSent, setOtpSent] = useState(false)
+  const [otp, setOtp] = useState("")
+  const [otpUserId, setOtpUserId] = useState("")
+  const [countdown, setCountdown] = useState(0)
+  const [isSendingOtp, setIsSendingOtp] = useState(false)
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
+  const [otpError, setOtpError] = useState("")
+  const [otpSuccessMessage, setOtpSuccessMessage] = useState("")
+
+  // Closed dates state
+  const [closedDates, setClosedDates] = useState([])
+
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split("T")[0]
   const now = new Date().toTimeString().slice(0, 5)
@@ -38,18 +52,37 @@ export default function Bookapointment() {
     gender: "male"
   })
 
+  // Fetch closed dates
+  const fetchClosedDates = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getOPDClosedDates?doctorId=${id}`)
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        setClosedDates(data)
+      } else {
+        setClosedDates([])
+      }
+    } catch (error) {
+      console.error("Error fetching closed dates:", error)
+      setClosedDates([])
+    }
+  }
+
+  // Check if a date is closed
+  const isDateClosed = (dateString) => {
+    return closedDates.some(closedDate => closedDate.closedDate === dateString)
+  }
+
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(email)
   }
 
-  // Add validation function for phone number (10 digits)
   const validatePhone = (phone) => {
     const phoneRegex = /^\d{10}$/
     return phoneRegex.test(phone)
   }
 
-  // Add state for validation errors
   const [validationErrors, setValidationErrors] = useState({
     mobile: "",
     email: "",
@@ -59,6 +92,15 @@ export default function Bookapointment() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [authError, setAuthError] = useState("")
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    let timer
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+    }
+    return () => clearTimeout(timer)
+  }, [countdown])
 
   const isWeekOffDay = (dateString) => {
     if (!doctorData?.weekOff) return false;
@@ -85,15 +127,12 @@ export default function Bookapointment() {
     return maxDate.toISOString().split("T")[0];
   };
 
-
-  // Add this function to get the next available date
   const getNextAvailableDate = (dateString) => {
     if (!doctorData?.weekOff) return dateString;
 
     let nextDate = new Date(dateString);
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    // Keep adding days until we find a non-weekoff day
     do {
       nextDate.setDate(nextDate.getDate() + 1);
     } while (days[nextDate.getDay()] === doctorData.weekOff);
@@ -101,16 +140,40 @@ export default function Bookapointment() {
     return nextDate.toISOString().split("T")[0];
   };
 
+  // Get next available date considering both week off and closed dates
+  const getNextAvailableDateConsideringAll = (dateString) => {
+    let nextDate = new Date(dateString);
+    const maxDate = getMaxDate();
+    
+    while (true) {
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nextDateString = nextDate.toISOString().split("T")[0];
+      
+      // Stop if we exceed max date
+      if (maxDate && nextDateString > maxDate) {
+        return null;
+      }
+      
+      // Check if this date is available
+      if (!isWeekOffDay(nextDateString) && !isDateClosed(nextDateString)) {
+        return nextDateString;
+      }
+    }
+  };
+
   // Fetch doctor details
   useEffect(() => {
     const fetchDoctor = async () => {
       try {
         const res = await fetch(
-          `https://api.oneclickhelp.in/api/getDoctorsById?doctorId=${id}`
+          `${process.env.NEXT_PUBLIC_API_URL}api/getDoctorsById?doctorId=${id}`
         )
         if (!res.ok) throw new Error("Failed to fetch doctor")
         const data = await res.json()
         setDoctorData(data)
+        
+        // Fetch closed dates after doctor data is loaded
+        await fetchClosedDates()
       } catch (err) {
         setError(err.message)
       } finally {
@@ -146,11 +209,9 @@ export default function Bookapointment() {
         let apiUrl;
 
         if (doctorData.is_token) {
-          // For tokens, use the OPD shifts API
-          apiUrl = `https://api.oneclickhelp.in/api/getDoctorOPDShifts?doctorId=${id}`
+          apiUrl = `${process.env.NEXT_PUBLIC_API_URL}api/getDoctorOPDShifts?doctorId=${id}`
         } else {
-          // For appointments, use the slots API
-          apiUrl = `https://api.oneclickhelp.in/api/getDoctorSlots?doctorId=${id}&date=${appointmentDate}`
+          apiUrl = `${process.env.NEXT_PUBLIC_API_URL}api/getDoctorSlots?doctorId=${id}&date=${appointmentDate}`
         }
 
         const res = await fetch(apiUrl)
@@ -158,14 +219,12 @@ export default function Bookapointment() {
         const data = await res.json()
 
         if (doctorData.is_token) {
-          // For tokens, use the data directly from the OPD shifts API
           setShifts(data.data || [])
         } else {
-          // For appointments, use the data structure from the slots API
           setShifts(data)
         }
 
-        setSelectedShift(null) // Reset selected shift when date changes
+        setSelectedShift(null)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -176,21 +235,229 @@ export default function Bookapointment() {
     fetchShifts()
   }, [id, appointmentDate, doctorData])
 
-  // Function to register or get user
+  // Function to handle date selection with validation
+  const handleDateChange = (selectedDate) => {
+    if (isWeekOffDay(selectedDate)) {
+      const nextAvailable = getNextAvailableDateConsideringAll(selectedDate);
+      Swal.fire({
+        title: "Not Available",
+        text: `The doctor is not available on ${doctorData.weekOff}s. Would you like to select the next available date?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Please choose another date",
+        cancelButtonText: "Cancel"
+      }).then((result) => {
+        if (result.isConfirmed && nextAvailable) {
+          setAppointmentDate(nextAvailable);
+        } else {
+          setAppointmentDate(today);
+        }
+      });
+    } else if (isDateClosed(selectedDate)) {
+      const nextAvailable = getNextAvailableDateConsideringAll(selectedDate);
+      Swal.fire({
+        title: "OPD Closed",
+        text: `The OPD is closed on this date. Would you like to select the next available date?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Please choose another date",
+        cancelButtonText: "Cancel"
+      }).then((result) => {
+        if (result.isConfirmed && nextAvailable) {
+          setAppointmentDate(nextAvailable);
+        } else {
+          setAppointmentDate(today);
+        }
+      });
+    } else {
+      setAppointmentDate(selectedDate);
+    }
+  };
+
+  // OTP Functions
+  const handleSendOtp = async () => {
+    const patientData = patientType === "self" ? formData : someoneElseData
+    
+    if (!validatePhone(patientData.mobile)) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [patientType === "self" ? "mobile" : "someoneElseMobile"]: "Please enter a valid 10-digit phone number"
+      }))
+      return false
+    }
+
+    setIsSendingOtp(true)
+    setOtpError("")
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/generateAndSendOtp`, {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: patientData.mobile,
+          roleId: 1,
+          authType: 'Booking',
+          name: patientData.fullName,
+          gender: patientData.gender
+        })
+      })
+
+      const contentType = response.headers.get("content-type");
+      let data;
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || `Server returned ${response.status}: ${response.statusText}`);
+      }
+
+      if (response.ok && data.status) {
+        setOtpSuccessMessage(data.message);
+        setOtpSent(true)
+        setOtpUserId(data.data.userId)
+        setCountdown(60)
+        return true
+      } else {
+        setOtpError(data.message || "Failed to send OTP")
+        return false
+      }
+    } catch (error) {
+      setOtpError(error.message || "Network error. Please try again.")
+      return false
+    } finally {
+      setIsSendingOtp(false)
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) {
+      setOtpError("Please enter a valid 6-digit OTP")
+      return false
+    }
+
+    setIsVerifyingOtp(true)
+    setOtpError("")
+
+    try {
+      const patientData = patientType === "self" ? formData : someoneElseData
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: patientData.mobile,
+          otp: otp,
+          userId: otpUserId,
+          roleId:1
+        })
+      })
+
+      const contentType = response.headers.get("content-type");
+      let data;
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || `Server returned ${response.status}: ${response.statusText}`);
+      }
+
+      if (response.ok && data.status) {
+        // OTP verification successful
+        sessionStorage.setItem("userId", data.data.userId)
+        sessionStorage.setItem("userName", data.data.userName)
+        sessionStorage.setItem('userRole', "1")
+        setIsLoggedIn(true)
+        
+        // Reset OTP state
+        setOtpSent(false)
+        setOtp("")
+        setOtpError("")
+        return true
+      } else {
+        setOtpError(data.message || "Invalid OTP. Please try again.")
+        return false
+      }
+    } catch (error) {
+      setOtpError(error.message || "Network error. Please try again.")
+      return false
+    } finally {
+      setIsVerifyingOtp(false)
+    }
+  }
+
+  const resendOtp = async () => {
+    if (countdown > 0) return
+    
+    setIsSendingOtp(true)
+    setOtpError("")
+
+    try {
+      const patientData = patientType === "self" ? formData : someoneElseData
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/generateAndSendOtp`, {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: patientData.mobile,
+          roleId: 1,
+          authType: 'Booking',
+          name: patientData.fullName,
+          gender: patientData.gender
+        })
+      })
+
+      const contentType = response.headers.get("content-type");
+      let data;
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || `Server returned ${response.status}: ${response.statusText}`);
+      }
+
+      if (response.ok && data.status) {
+        setOtpSuccessMessage(data.message);
+        setCountdown(60)
+        setOtpError("")
+      } else {
+        setOtpError(data.message || "Failed to resend OTP")
+      }
+    } catch (error) {
+      setOtpError(error.message || "Network error. Please try again.")
+    } finally {
+      setIsSendingOtp(false)
+    }
+  }
+
+  // Function to register or get user (now only used after OTP verification)
   const handleAuth = async () => {
     try {
       setAuthError("")
-      const response = await fetch('https://api.oneclickhelp.in/api/registerUser', {
+      const patientData = patientType === "self" ? formData : someoneElseData
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/registerUser`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.fullName,
-          password: "1234", // default
-          phone: formData.mobile,
-          email: formData.email,
-          gender: formData.gender,
+          name: patientData.fullName,
+          password: "1234",
+          phone: patientData.mobile,
+          email: patientData.email,
+          gender: patientData.gender,
           role_id: 0
         })
       })
@@ -198,10 +465,8 @@ export default function Bookapointment() {
       const data = await response.json()
 
       if (data.status && data.data?.userId) {
-        // Save userId to session
         sessionStorage.setItem("userId", data.data.userId)
-        sessionStorage.setItem("userName", formData.fullName,)
-        setIsLoggedIn(true)
+        sessionStorage.setItem("userName", patientData.fullName)
         return true
       } else {
         setAuthError(data.message || "Registration failed")
@@ -216,6 +481,26 @@ export default function Bookapointment() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    // If OTP is not verified, send OTP first
+    if (!isLoggedIn && !otpSent) {
+      const otpSentSuccess = await handleSendOtp()
+      if (!otpSentSuccess) {
+        return
+      }
+      // Show message to enter OTP
+      Swal.fire("OTP Sent", "Please enter the OTP sent to your mobile number", "info")
+      return
+    }
+
+    // If OTP is sent but not verified, verify OTP
+    if (otpSent && !isLoggedIn) {
+      const otpVerified = await handleVerifyOtp()
+      if (!otpVerified) {
+        return
+      }
+      // Continue with booking after successful OTP verification
+    }
 
     // Validate inputs
     const patientData = patientType === "self" ? formData : someoneElseData
@@ -235,7 +520,6 @@ export default function Bookapointment() {
       return
     }
 
-    // Clear any previous validation errors
     setValidationErrors({})
 
     setIsSubmitting(true)
@@ -246,8 +530,22 @@ export default function Bookapointment() {
       return
     }
 
-    // If user not logged in → register first
-    if (!isLoggedIn) {
+    // Check if selected date is closed
+    if (isDateClosed(appointmentDate)) {
+      Swal.fire("OPD Closed", "The OPD is closed on the selected date. Please choose another date.", "warning")
+      setIsSubmitting(false)
+      return
+    }
+
+    // Check if selected date is week off
+    if (isWeekOffDay(appointmentDate)) {
+      Swal.fire("Not Available", `The doctor is not available on ${doctorData.weekOff}s. Please choose another date.`, "warning")
+      setIsSubmitting(false)
+      return
+    }
+
+    // Register user if not already registered (after OTP verification)
+    if (isLoggedIn && !sessionStorage.getItem("userId")) {
       const authSuccess = await handleAuth()
       if (!authSuccess) {
         setIsSubmitting(false)
@@ -262,8 +560,7 @@ export default function Bookapointment() {
       let bookingData
 
       if (doctorData.is_token) {
-        // Book Token
-        bookingRes = await fetch("https://api.oneclickhelp.in/api/bookToken", {
+        bookingRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/bookToken`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -279,8 +576,7 @@ export default function Bookapointment() {
         })
         bookingData = await bookingRes.json()
       } else {
-        // Book Appointment
-        bookingRes = await fetch("https://api.oneclickhelp.in/api/bookAppointment", {
+        bookingRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/bookAppointment`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -312,7 +608,6 @@ export default function Bookapointment() {
             }
           });
         } else {
-          // Appointment booking success
           Swal.fire({
             title: "Appointment Booked 🎉",
             html: `
@@ -343,6 +638,11 @@ export default function Bookapointment() {
       ...prev,
       [field]: value,
     }))
+    // Reset OTP state if mobile number changes
+    if (field === "mobile" && otpSent) {
+      setOtpSent(false)
+      setOtp("")
+    }
   }
 
   const handleSomeoneElseInputChange = (field, value) => {
@@ -350,14 +650,17 @@ export default function Bookapointment() {
       ...prev,
       [field]: value,
     }))
+    // Reset OTP state if mobile number changes
+    if (field === "mobile" && otpSent) {
+      setOtpSent(false)
+      setOtp("")
+    }
   }
 
-  // Function to calculate minimum date for appointment (today)
   const getMinDate = () => {
     return new Date().toISOString().split("T")[0]
   }
 
-  // Format time for display
   const formatTime = (timeString) => {
     return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-IN', {
       hour: '2-digit',
@@ -412,28 +715,22 @@ export default function Bookapointment() {
                 value={appointmentDate}
                 min={getMinDate()}
                 max={getMaxDate()}
-                onChange={(e) => {
-                  const selectedDate = e.target.value;
-
-                  if (isWeekOffDay(selectedDate)) {
-                    const nextAvailable = getNextAvailableDate(selectedDate);
-                    Swal.fire({
-                      title: "Not Available",
-                      text: `The doctor is not available on ${doctorData.weekOff}s. Please select another date.`,
-                      icon: "warning",
-                      showCancelButton: true,
-                      confirmButtonText: "Select Next Available",
-                    }).then((result) => {
-                      setAppointmentDate(today);
-                    });
-                  } else {
-                    setAppointmentDate(selectedDate);
-                  }
-                }}
+                onChange={(e) => handleDateChange(e.target.value)}
                 className={styles.dateInput}
               />
-
             </div>
+
+            {/* Display warning messages if current selected date has issues */}
+            {isWeekOffDay(appointmentDate) && (
+              <div className={styles.warningMessage}>
+                ⚠️ Doctor is not available on {doctorData.weekOff}s
+              </div>
+            )}
+            {isDateClosed(appointmentDate) && (
+              <div className={styles.warningMessage}>
+                ⚠️ OPD is closed on this date
+              </div>
+            )}
 
             {/* Shift Selection */}
             <div className="mt-4">
@@ -475,6 +772,8 @@ export default function Bookapointment() {
             </div>
           </>
         </div>
+
+
 
         {/* Doctor Section */}
         <div className={styles.doctorSection}>
@@ -534,6 +833,7 @@ export default function Bookapointment() {
             </p>
           </div>
         </div>
+        
 
         <Link href="/"><button className={styles.backBtn}>Go back to my results</button></Link>
       </div>
@@ -544,7 +844,7 @@ export default function Bookapointment() {
 
         <form onSubmit={handleSubmit} className={styles.patientForm}>
           {/* patientType selection - Only show for appointments, not tokens */}
-          {!is_token && (
+          {/* {!is_token && (
             <div className={styles.patientTypeSection}>
               <p className={styles.appointmentFor}>
                 This in-clinic appointment is for:
@@ -572,7 +872,7 @@ export default function Bookapointment() {
                 </label>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Patient form fields */}
           <div className={styles.formSection}>
@@ -599,7 +899,6 @@ export default function Bookapointment() {
                   <label className={styles.inputLabel}>
                     Whatsapp Number<span className={styles.required}>*</span>
                   </label>
-
                   <input
                     type="tel"
                     value={formData.mobile}
@@ -613,7 +912,6 @@ export default function Bookapointment() {
                     maxLength="10"
                   />
                   {validationErrors.mobile && <p className={styles.validationError}>{validationErrors.mobile}</p>}
-
                 </div>
 
                 <div className={styles.inputGroup}>
@@ -632,27 +930,69 @@ export default function Bookapointment() {
                   </select>
                 </div>
 
-                {/* Show email and gender only for appointments, not tokens */}
+                {/* Show email only for appointments, not tokens */}
                 {!is_token && (
-                  <>
-                    <div className={styles.inputGroup}>
-                      <label className={styles.inputLabel}>
-                        Email (Optional)
-                      </label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => {
-                          handleInputChange("email", e.target.value)
-                          setValidationErrors(prev => ({ ...prev, email: "" }))
-                        }}
-                        className={styles.textInput}
-                        placeholder="Enter Your Email Address"
-                      />
-                      {validationErrors.email && <p className={styles.validationError}>{validationErrors.email}</p>}
-                    </div>
+                  <div className={styles.inputGroup}>
+                    <label className={styles.inputLabel}>
+                      Email (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => {
+                        handleInputChange("email", e.target.value)
+                        setValidationErrors(prev => ({ ...prev, email: "" }))
+                      }}
+                      className={styles.textInput}
+                      placeholder="Enter Your Email Address"
+                    />
+                    {validationErrors.email && <p className={styles.validationError}>{validationErrors.email}</p>}
+                  </div>
+                )}
 
-                  </>
+                {/* OTP Verification Section */}
+                {!isLoggedIn && (
+                  <div className={styles.otpSection}>
+                    {otpSent ? (
+                      <>
+                        <div className={styles.inputGroup}>
+                          <label className={styles.inputLabel}>
+                            Enter OTP<span className={styles.required}>*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className={styles.textInput}
+                            placeholder="Enter 6-digit OTP"
+                            maxLength="6"
+                          />
+                          {/* <div className={styles.otpActions}>
+                            <button
+                              type="button"
+                              onClick={resendOtp}
+                              disabled={countdown > 0 || isSendingOtp}
+                              className={styles.resendBtn}
+                            >
+                              {isSendingOtp ? "Sending..." : countdown > 0 ? `Resend in ${countdown}s` : "Resend OTP"}
+                            </button>
+                          </div> */}
+                        </div>
+                        {otpSuccessMessage && <p className={styles.otpSuccess}>{otpSuccessMessage}</p>}
+                        {otpError && <p className={styles.otpError}>{otpError}</p>}
+                      </>
+                    ) : (
+                      <>
+                       {otpError ? (
+                        <p className={styles.otpError}>{otpError}</p>
+                      ) : (
+                        <div className={styles.otpNotice}>
+                          <p>You need to verify your mobile number before getting {is_token ? "token" : "booking"}</p>
+                        </div>
+                      )}     
+                      </>
+                    )}
+                  </div>
                 )}
 
                 {authError && <p className={styles.authError}>{authError}</p>}
@@ -693,7 +1033,6 @@ export default function Bookapointment() {
                     maxLength="10"
                   />
                   {validationErrors.someoneElseMobile && <p className={styles.validationError}>{validationErrors.someoneElseMobile}</p>}
-
                 </div>
 
                 {/* Show email and gender only for appointments, not tokens */}
@@ -714,7 +1053,6 @@ export default function Bookapointment() {
                         placeholder="Enter Patient's Email Address"
                       />
                       {validationErrors.someoneElseEmail && <p className={styles.validationError}>{validationErrors.someoneElseEmail}</p>}
-
                     </div>
 
                     <div className={styles.inputGroup}>
@@ -735,27 +1073,94 @@ export default function Bookapointment() {
                   </>
                 )}
 
+                {/* OTP Verification Section for someone else */}
+                {!isLoggedIn && (
+                  <div className={styles.otpSection}>
+                    {otpSent ? (
+                      <>
+                        <div className={styles.inputGroup}>
+                          <label className={styles.inputLabel}>
+                            Enter OTP<span className={styles.required}>*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className={styles.textInput}
+                            placeholder="Enter 6-digit OTP"
+                            maxLength="6"
+                          />
+                          <div className={styles.otpActions}>
+                            <button
+                              type="button"
+                              onClick={resendOtp}
+                              disabled={countdown > 0 || isSendingOtp}
+                              className={styles.resendBtn}
+                            >
+                              {isSendingOtp ? "Sending..." : countdown > 0 ? `Resend in ${countdown}s` : "Resend OTP"}
+                            </button>
+                          </div>
+                        </div>
+                        {otpError && <p className={styles.otpError}>{otpError}</p>}
+                      </>
+                    ) : (
+                      <div className={styles.otpNotice}>
+                        <p>You need to verify the patient's mobile number before booking</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {authError && <p className={styles.authError}>{authError}</p>}
               </>
             )}
           </div>
 
-          {/* Payment Section - Different for tokens vs appointments */}
+          {/* Payment Section */}
           {is_token ? (
+            <>
             <div className="text-center">
               <button
                 type="submit"
-                disabled={isSubmitting || !selectedShift}
+                disabled={isSubmitting || !selectedShift || (isVerifyingOtp)}
                 className={styles.confirmBtn}
               >
-                {isSubmitting
-                  ? "Processing..."
-                  : doctorData.is_fees_online
-                    ? `Pay ₹${tokenFees || 10}`
-                    : "Book Token"}
+                {isVerifyingOtp ? "Verifying OTP..." : 
+                 isSubmitting ? "Processing..." : 
+                 doctorData.is_fees_online ? `Pay ₹${tokenFees || 10}` : "Book Token"}
               </button>
             </div>
-
+            <div className="bg-white rounded-lg shadow-md mb-10 p-6 max-w-md w-full border-l-4 border-yellow-400">
+          <div className="flex items-start">
+            {/* Warning Icon */}
+            <div className="flex-shrink-0">
+              <svg
+                className="w-6 h-6 text-yellow-500"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            {/* Content */}
+            <div className="ml-3">
+              <h3 className="text-lg font-medium text-gray-900">Kindly Note:</h3>
+              <div className="mt-2 text-sm text-gray-700">
+                <p className="font-medium">
+                  The Token Fee is only for reserving your spot in the queue.
+                </p>
+                <p className="mt-2">
+                  The OPD Consultation Fee is a separate charge that you will need to
+                  pay to the doctor during your visit.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div></>
           ) : (
             <div className={styles.paymentSection}>
               {doctorData.is_fees_online && (
@@ -775,8 +1180,6 @@ export default function Bookapointment() {
                       <div className={styles.paymentDetails}>
                         <div className={styles.paymentPrice}>
                           <span className={styles.originalPrice}>₹{fees}</span>
-                          {/* <span className={styles.strikePrice}>₹{fees}</span> */}
-                          {/* <span className={styles.discount}>₹50 OFF*</span> */}
                         </div>
                         <div className={styles.paymentMethod}>
                           <span>Pay Online</span>
@@ -786,40 +1189,25 @@ export default function Bookapointment() {
                         </div>
                       </div>
                     </label>
-
-                    {/* <label className={styles.paymentOption}>
-                      <input
-                        type="radio"
-                        name="payment"
-                        value="clinic"
-                        checked={paymentOption === "clinic"}
-                        onChange={(e) => setPaymentOption(e.target.value)}
-                      />
-                      <div className={styles.paymentDetails}>
-                        <div className={styles.paymentPrice}>
-                          <span className={styles.originalPrice}>₹{fees}</span>
-                        </div>
-                        <div className={styles.paymentMethod}>
-                          <span>Pay later at the clinic</span>
-                        </div>
-                      </div>
-                    </label> */}
                   </div>
                 </>
               )}
 
               <button
                 type="submit"
-                disabled={isSubmitting || !selectedShift}
+                disabled={isSubmitting || !selectedShift || (isVerifyingOtp)}
                 className={styles.confirmBtn}
               >
-                {isSubmitting ? "Processing..." : "Confirm Clinic Visit"}
+                {isVerifyingOtp ? "Verifying OTP..." : 
+                 isSubmitting ? "Processing..." : 
+                 "Confirm Clinic Visit"}
               </button>
             </div>
-
           )}
         </form>
+        
       </div>
+
     </div>
   )
 }

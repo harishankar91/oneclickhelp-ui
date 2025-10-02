@@ -534,3 +534,51 @@
   .validationError{
     color: red;
   }
+  /* Add these to your bookapointment.module.scss */
+
+.otpSection {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.otpNotice {
+  text-align: center;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.otpResend {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.resendBtn {
+  color: #007bff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.resendBtn:disabled {
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+.otpError {
+  color: #dc3545;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.otpSuccess {
+  color: #28a745;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  text-align: center;
+}

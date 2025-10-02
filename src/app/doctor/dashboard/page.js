@@ -22,22 +22,28 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [showSlotsModal, setShowSlotsModal] = useState(false)
   const [showShiftsModal, setShowShiftsModal] = useState(false)
+  const [showClosedDatesModal, setShowClosedDatesModal] = useState(false) // New state for closed dates modal
   const [doctorSlots, setDoctorSlots] = useState([])
-
   const [doctorShifts, setDoctorShifts] = useState([])
+  const [closedDates, setClosedDates] = useState([]) // New state for closed dates
+  const [newClosedDate, setNewClosedDate] = useState("") // New state for adding closed date
+
   const [newShift, setNewShift] = useState({
     shiftId: "",
     startTime: "09:00",
     endTime: "17:00",
     maxAllowedPatients: 10
   })
-  const [availableShifts, setAvailableShifts] = useState([]) // Add this state for available shifts
+  const [availableShifts, setAvailableShifts] = useState([])
+  const [shiftError, setShiftError] = useState("")
 
   const [newSlot, setNewSlot] = useState({
     date: new Date().toISOString().split('T')[0],
     startTime: "09:00",
     endTime: "10:00"
   })
+  const [slotError, setSlotError] = useState("")
+  const [closedDateError, setClosedDateError] = useState("") // New error state for closed dates
 
   const [slotFilterDate, setSlotFilterDate] = useState(new Date().toISOString().split('T')[0])
 
@@ -59,6 +65,7 @@ export default function Dashboard() {
     fetchTodayBookings()
     fetchUpcomingBookings()
     fetchAvailableShifts()
+    fetchClosedDates() // Fetch closed dates on component mount
 
     // Add event listener to close dropdown when clicking outside
     document.addEventListener('mousedown', handleClickOutside)
@@ -75,9 +82,97 @@ export default function Dashboard() {
     }
   }
 
+  // Function to get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    return new Date().toISOString().split('T')[0]
+  }
+
+  // Function to validate time (end time should not be less than start time)
+  const validateTime = (startTime, endTime) => {
+    const [startHours, startMinutes] = startTime.split(':').map(Number)
+    const [endHours, endMinutes] = endTime.split(':').map(Number)
+
+    if (endHours < startHours) {
+      return false
+    }
+    if (endHours === startHours && endMinutes <= startMinutes) {
+      return false
+    }
+    return true
+  }
+
+  // Function to validate slot before adding
+  const validateSlot = () => {
+    setSlotError("")
+
+    if (!newSlot.date) {
+      setSlotError("Please select a date")
+      return false
+    }
+
+    if (!validateTime(newSlot.startTime, newSlot.endTime)) {
+      setSlotError("End time must be greater than start time")
+      return false
+    }
+
+    // Check if date is not in the past
+    if (newSlot.date < getTodayDate()) {
+      setSlotError("Cannot add slots for previous dates")
+      return false
+    }
+
+    return true
+  }
+
+  // Function to validate shift before adding
+  const validateShift = () => {
+    setShiftError("")
+
+    if (!newShift.shiftId) {
+      setShiftError("Please select a shift")
+      return false
+    }
+
+    if (!validateTime(newShift.startTime, newShift.endTime)) {
+      setShiftError("End time must be greater than start time")
+      return false
+    }
+
+    if (!newShift.maxAllowedPatients || newShift.maxAllowedPatients < 1) {
+      setShiftError("Please enter a valid number of patients")
+      return false
+    }
+
+    return true
+  }
+
+  // Function to validate closed date before adding
+  const validateClosedDate = () => {
+    setClosedDateError("")
+
+    if (!newClosedDate) {
+      setClosedDateError("Please select a date")
+      return false
+    }
+
+    // Check if date is not in the past
+    if (newClosedDate < getTodayDate()) {
+      setClosedDateError("Cannot add closed dates for previous dates")
+      return false
+    }
+
+    // Check if date is already in the closed dates list
+    if (closedDates.some(date => date.closedDate === newClosedDate)) {
+      setClosedDateError("This date is already marked as closed")
+      return false
+    }
+
+    return true
+  }
+
   const fetchAvailableShifts = async () => {
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/getOPDShiftDetails')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getOPDShiftDetails`)
       const data = await response.json()
       if (data.status) {
         setAvailableShifts(data.data)
@@ -90,9 +185,25 @@ export default function Dashboard() {
     }
   }
 
+  // Fetch closed dates for the doctor
+  const fetchClosedDates = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getOPDClosedDates?doctorId=${userId}`)
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        setClosedDates(data)
+      } else {
+        setClosedDates([])
+      }
+    } catch (error) {
+      console.error("Error fetching closed dates:", error)
+      setClosedDates([])
+    }
+  }
+
   const fetchDoctorData = async () => {
     try {
-      const response = await fetch(`https://api.oneclickhelp.in/api/getDoctorsById?doctorId=${userId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getDoctorsById?doctorId=${userId}`)
       const data = await response.json()
       setDoctorData(data)
     } catch (error) {
@@ -103,7 +214,7 @@ export default function Dashboard() {
   // Fetch the list of available statuses
   const fetchStatusList = async () => {
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/getTokenStatusList')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getTokenStatusList`)
       const data = await response.json()
       setStatusList(data)
     } catch (error) {
@@ -115,7 +226,7 @@ export default function Dashboard() {
   const fetchDoctorSlots = async (date = null) => {
     try {
       const filterDate = date || slotFilterDate;
-      const response = await fetch(`https://api.oneclickhelp.in/api/getDoctorSlots?doctorId=${doctorData.doctorId}&date=${filterDate}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getDoctorSlots?doctorId=${doctorData.doctorId}&date=${filterDate}`)
       const data = await response.json()
       setDoctorSlots(Array.isArray(data) ? data : [])
     } catch (error) {
@@ -127,7 +238,7 @@ export default function Dashboard() {
   // Fetch doctor's shifts
   const fetchDoctorShifts = async () => {
     try {
-      const response = await fetch(`https://api.oneclickhelp.in/api/getDoctorOPDShifts?doctorId=${userId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getDoctorOPDShifts?doctorId=${userId}`)
       const data = await response.json()
       if (data.status) {
         setDoctorShifts(data.data)
@@ -146,7 +257,7 @@ export default function Dashboard() {
       let todayBookings = [];
 
       // Fetch tokens
-      const tokenResponse = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?fromDate=${selectedDate}&toDate=${selectedDate}&doctorId=${userId}`)
+      const tokenResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getTokenDetailsByDocIdAndDate?fromDate=${selectedDate}&toDate=${selectedDate}&doctorId=${userId}`)
       const tokenData = await tokenResponse.json()
 
       const tokenBookings = tokenData.map(token => ({
@@ -167,7 +278,7 @@ export default function Dashboard() {
       todayBookings = [...todayBookings, ...tokenBookings];
 
       // Fetch appointments
-      const appointmentResponse = await fetch(`https://api.oneclickhelp.in/api/getAppointmentsByDocIdAndDate?fromDate=${selectedDate}&toDate=${selectedDate}&doctorId=${userId}`)
+      const appointmentResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getAppointmentsByDocIdAndDate?fromDate=${selectedDate}&toDate=${selectedDate}&doctorId=${userId}`)
       const appointmentData = await appointmentResponse.json()
 
       const appointmentBookings = appointmentData.map(appointment => ({
@@ -216,7 +327,7 @@ export default function Dashboard() {
       const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       // Fetch tokens
-      const tokenResponse = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?fromDate=${today}&toDate=${nextWeek}&doctorId=${userId}`)
+      const tokenResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getTokenDetailsByDocIdAndDate?fromDate=${today}&toDate=${nextWeek}&doctorId=${userId}`)
       const tokenData = await tokenResponse.json()
 
       const tokenBookings = tokenData
@@ -239,7 +350,7 @@ export default function Dashboard() {
       upcomingBookings = [...upcomingBookings, ...tokenBookings];
 
       // Fetch appointments
-      const appointmentResponse = await fetch(`https://api.oneclickhelp.in/api/getAppointmentsByDocIdAndDate?fromDate=${today}&toDate=${nextWeek}&doctorId=${userId}`)
+      const appointmentResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getAppointmentsByDocIdAndDate?fromDate=${today}&toDate=${nextWeek}&doctorId=${userId}`)
       const appointmentData = await appointmentResponse.json()
 
       const appointmentBookings = appointmentData
@@ -274,7 +385,7 @@ export default function Dashboard() {
       let filteredBookings = [];
 
       // Fetch tokens
-      const tokenResponse = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByDocIdAndDate?fromDate=${date}&toDate=${date}&doctorId=${userId}`)
+      const tokenResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getTokenDetailsByDocIdAndDate?fromDate=${date}&toDate=${date}&doctorId=${userId}`)
       const tokenData = await tokenResponse.json()
 
       const tokenBookings = tokenData.map(token => ({
@@ -295,7 +406,7 @@ export default function Dashboard() {
       filteredBookings = [...filteredBookings, ...tokenBookings];
 
       // Fetch appointments
-      const appointmentResponse = await fetch(`https://api.oneclickhelp.in/api/getAppointmentsByDocIdAndDate?fromDate=${date}&toDate=${date}&doctorId=${userId}`)
+      const appointmentResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getAppointmentsByDocIdAndDate?fromDate=${date}&toDate=${date}&doctorId=${userId}`)
       const appointmentData = await appointmentResponse.json()
 
       const appointmentBookings = appointmentData.map(appointment => ({
@@ -338,8 +449,12 @@ export default function Dashboard() {
 
   // Add a new slot
   const addSlot = async () => {
+    if (!validateSlot()) {
+      return
+    }
+
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/addDoctorSlots', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/addDoctorSlots`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -357,10 +472,11 @@ export default function Dashboard() {
       if (result.status) {
         alert(result.message || 'Slot added successfully!')
         setNewSlot({
-          date: new Date().toISOString().split('T')[0],
+          date: getTodayDate(),
           startTime: "09:00",
           endTime: "10:00"
         })
+        setSlotError("")
         fetchDoctorSlots(newSlot.date)
       } else {
         alert('Failed to add slot: ' + result.message)
@@ -373,8 +489,12 @@ export default function Dashboard() {
 
   // Add a new shift
   const addShift = async () => {
+    if (!validateShift()) {
+      return
+    }
+
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/addShiftAndMaxPatients', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/addShiftAndMaxPatients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -398,6 +518,7 @@ export default function Dashboard() {
           endTime: "17:00",
           maxAllowedPatients: 10
         })
+        setShiftError("")
         fetchDoctorShifts()
       } else {
         alert('Failed to add shift: ' + result.message)
@@ -405,6 +526,72 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error adding shift:", error)
       alert('Error adding shift. Please try again.')
+    }
+  }
+
+  // Add a closed date
+  const addClosedDate = async () => {
+    if (!validateClosedDate()) {
+      return
+    }
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/addOPDClosedDates`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify([
+          {
+            doctorId: userId,
+            closedDate: newClosedDate
+          }
+        ])
+      })
+
+      const result = await response.json()
+
+      if (result.status) {
+        alert('OPD Closed date added successfully!')
+        setNewClosedDate("")
+        setClosedDateError("")
+        fetchClosedDates() // Refresh the closed dates list
+      } else {
+        alert('Failed to add closed date: ' + result.message)
+      }
+    } catch (error) {
+      console.error("Error adding closed date:", error)
+      alert('Error adding closed date. Please try again.')
+    }
+  }
+
+  // Remove a closed date
+  const removeClosedDate = async (closedDate) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/removeOPDClosedDates`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify([
+          {
+            doctorId: userId,
+            closedDate: closedDate
+          }
+        ])
+      })
+
+      const result = await response.json()
+
+      if (result.status) {
+        alert('OPD Closed date removed successfully!')
+        fetchClosedDates() // Refresh the closed dates list
+      } else {
+        alert('Failed to remove closed date: ' + result.message)
+      }
+    } catch (error) {
+      console.error("Error removing closed date:", error)
+      alert('Error removing closed date. Please try again.')
     }
   }
 
@@ -420,9 +607,9 @@ export default function Dashboard() {
       let apiUrl = '';
 
       if (bookingType === 'Token') {
-        apiUrl = 'https://api.oneclickhelp.in/api/updateTokenStatus';
+        apiUrl = `${process.env.NEXT_PUBLIC_API_URL}api/updateTokenStatus`;
       } else if (bookingType === 'Appointment') {
-        apiUrl = 'https://api.oneclickhelp.in/api/updateAppointmentStatus';
+        apiUrl = `${process.env.NEXT_PUBLIC_API_URL}api/updateAppointmentStatus`;
       } else {
         console.error("Unknown booking type");
         return;
@@ -480,19 +667,76 @@ export default function Dashboard() {
   // Open slots modal and fetch current slots
   const openSlotsModal = () => {
     setShowSlotsModal(true)
+    setSlotError("")
+    setNewSlot({
+      date: getTodayDate(),
+      startTime: "09:00",
+      endTime: "10:00"
+    })
     fetchDoctorSlots()
   }
 
   // Open shifts modal and fetch current shifts
   const openShiftsModal = () => {
     setShowShiftsModal(true)
+    setShiftError("")
+    setNewShift({
+      shiftId: "",
+      startTime: "09:00",
+      endTime: "17:00",
+      maxAllowedPatients: 10
+    })
     fetchDoctorShifts()
+  }
+
+  // Open closed dates modal and fetch current closed dates
+  const openClosedDatesModal = () => {
+    setShowClosedDatesModal(true)
+    setClosedDateError("")
+    setNewClosedDate("")
+    fetchClosedDates()
   }
 
   // Handle slot date filter change
   const handleSlotDateFilter = (date) => {
     setSlotFilterDate(date)
     fetchDoctorSlots(date)
+  }
+
+  // Handle slot time changes with validation
+  const handleSlotTimeChange = (field, value) => {
+    setNewSlot(prev => {
+      const updatedSlot = { ...prev, [field]: value }
+
+      // Validate time when both start and end times are set
+      if (updatedSlot.startTime && updatedSlot.endTime) {
+        if (!validateTime(updatedSlot.startTime, updatedSlot.endTime)) {
+          setSlotError("End time must be greater than start time")
+        } else {
+          setSlotError("")
+        }
+      }
+
+      return updatedSlot
+    })
+  }
+
+  // Handle shift time changes with validation
+  const handleShiftTimeChange = (field, value) => {
+    setNewShift(prev => {
+      const updatedShift = { ...prev, [field]: value }
+
+      // Validate time when both start and end times are set
+      if (updatedShift.startTime && updatedShift.endTime) {
+        if (!validateTime(updatedShift.startTime, updatedShift.endTime)) {
+          setShiftError("End time must be greater than start time")
+        } else {
+          setShiftError("")
+        }
+      }
+
+      return updatedShift
+    })
   }
 
   if (loading) {
@@ -537,10 +781,9 @@ export default function Dashboard() {
                       className="h-10 w-10 cursor-pointer rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       <img
-              src={doctorData?.photo_url ? `https://api.oneclickhelp.in${doctorData?.photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
-
-              className="h-10 w-10 rounded-full object-cover"
-            />
+                        src={doctorData?.photo_url ? `https://api.oneclickhelp.in${doctorData?.photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
                     </button>
 
                     {showDropdown && (
@@ -556,7 +799,6 @@ export default function Dashboard() {
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
                           >
                             <span className="flex cursor-pointer items-center">
-
                               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                               </svg>
@@ -615,6 +857,16 @@ export default function Dashboard() {
                 Manage Shifts
               </button>
             )}
+
+            <button
+              onClick={openClosedDatesModal}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+              Manage Closed Dates
+            </button>
 
             <Link
               href={`/doctor/book/${doctorData?.doctorId}`}
@@ -690,183 +942,177 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="border-b border-gray-200">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-                <nav className="flex -mb-px">
+                <nav className="flex flex-wrap -mb-px">
                   <button
                     onClick={() => setActiveTab('today')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${activeTab === 'today' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                    className={`py-3 px-4 sm:py-4 sm:px-6 text-center border-b-2 font-medium text-xs sm:text-sm md:text-base ${activeTab === 'today'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
                   >
                     Today's Bookings
                   </button>
                   <button
                     onClick={() => setActiveTab('upcoming')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${activeTab === 'upcoming' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                    className={`py-3 px-4 sm:py-4 sm:px-6 text-center border-b-2 font-medium text-xs sm:text-sm md:text-base ${activeTab === 'upcoming'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
                   >
                     Upcoming
                   </button>
                 </nav>
 
-                {/* Date Filter - Only show for Today's Bookings */}
                 {activeTab === 'today' && (
-                  <div className="px-6 py-4 md:py-0">
-                    <label htmlFor="date-filter" className="block text-sm font-medium text-gray-700 mr-2 mb-2 md:mb-0 md:inline-block">
+                  <div className="px-4 py-3 md:py-0 w-full sm:w-auto">
+                    <label
+                      htmlFor="date-filter"
+                      className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-0 sm:inline-block"
+                    >
                       Filter by Date:
                     </label>
                     <input
                       type="date"
                       id="date-filter"
                       value={selectedDate}
+                      min={getTodayDate()}
                       onChange={(e) => handleDateFilter(e.target.value)}
-                      className="border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="w-full sm:w-auto border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
                     />
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="p-6">
-              <div className="mb-4 flex justify-between items-center">
-                <h2 className="text-lg font-medium text-gray-900">
-                  {activeTab === 'today' ? "Today's Bookings" : "Upcoming Bookings"}
+            <div className="p-4 sm:p-6">
+              <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
+                <h2 className="text-base sm:text-lg font-medium text-gray-900">
+                  {activeTab === 'today' ? "Today's Bookings" : 'Upcoming Bookings'}
                 </h2>
-                <span className="text-sm text-gray-500">
+                <span className="text-xs sm:text-sm text-gray-500">
                   {activeTab === 'today'
-                    ? new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-                    : `Next 7 Days (${new Date().toLocaleDateString()} - ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()})`
-                  }
+                    ? new Date(selectedDate).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                    })
+                    : `Next 7 Days (${new Date(
+                      Date.now() + 1 * 24 * 60 * 60 * 1000
+                    ).toLocaleDateString()} - ${new Date(
+                      Date.now() + 7 * 24 * 60 * 60 * 1000
+                    ).toLocaleDateString()})`}
                 </span>
               </div>
 
-              {appointmentsLoading ? (
-                <div className="flex justify-center items-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                </div>
-              ) : (
-                <>
-                  {activeTab === 'today' && appointmentsToday.length === 0 ? (
-                    <div className="text-center py-8">
-                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      <h3 className="mt-2 text-sm font-medium text-gray-900">No bookings for {new Date(selectedDate).toLocaleDateString()}</h3>
-                      <p className="mt-1 text-sm text-gray-500">Get started by waiting for patients to book tokens or appointments.</p>
-                    </div>
-                  ) : activeTab === 'upcoming' && appointmentsUpcoming.length === 0 ? (
-                    <div className="text-center py-8">
-                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      <h3 className="mt-2 text-sm font-medium text-gray-900">No upcoming bookings</h3>
-                      <p className="mt-1 text-sm text-gray-500">No appointments scheduled for the next 7 days.</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-hidden bg-white rounded-lg shadow">
-                      <ul className="divide-y divide-gray-200">
-                        {(activeTab === 'today' ? appointmentsToday : appointmentsUpcoming).map((booking) => (
-                          <li key={booking.id} className="py-5 px-4 hover:bg-gray-50 transition-colors duration-150">
-                            <div className="flex space-x-4">
-                              <div className="flex-shrink-0">
-                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                  <span className="text-blue-600 font-medium">
-                                    {booking.patient.charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                              </div>
+              {/* Booking List */}
+              <ul className="divide-y divide-gray-200">
+                {(activeTab === 'today' ? appointmentsToday : appointmentsUpcoming).map(
+                  (booking) => (
+                    <li
+                      key={booking.id}
+                      className="py-4 sm:py-5 px-3 sm:px-4 hover:bg-gray-50 transition-colors duration-150"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
+                        {/* Avatar */}
+                        <div className="flex-shrink-0 self-center sm:self-start">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-blue-600 font-medium">
+                              {booking.patient.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
 
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center">
-                                    <p className="text-md font-semibold text-gray-900">
-                                      {booking.patient}
-                                    </p>
-                                    <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${booking.bookingType === 'Token' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                                      {booking.bookingType} {booking.tokenNumber && `#${booking.tokenNumber}`}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center text-sm text-gray-500">
-                                    {booking.date && (
-                                      <span className="mr-2 flex items-center">
-                                        <svg className="mr-1 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        {new Date(booking.date).toLocaleDateString()}
-                                      </span>
-                                    )}
-                                    <span className="flex items-center">
-                                      <svg className="mr-1 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                      </svg>
-                                      {booking.shiftOrSlot}
-                                    </span>
-                                  </div>
-                                </div>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-wrap items-center">
+                              <p className="text-sm sm:text-md font-semibold text-gray-900 mr-2">
+                                {booking.patient}
+                              </p>
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium ${booking.bookingType === 'Token'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-green-100 text-green-800'
+                                  }`}
+                              >
+                                {booking.bookingType}{' '}
+                                {booking.tokenNumber && `#${booking.tokenNumber}`}
+                              </span>
+                            </div>
 
-                                <div className="mt-2 flex items-center justify-between">
-                                  <div>
-                                    <p className="text-sm text-gray-600">
-                                      {booking.type}
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-1 flex items-center">
-                                      <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                      </svg>
-                                      {booking.patientGender}
-                                      <svg className="mx-2 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                      </svg>
-                                      <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                      </svg>
-                                      {booking.patientPhone}
-                                    </p>
-                                  </div>
+                            <div className="mt-2 sm:mt-0 flex flex-wrap items-center text-xs sm:text-sm text-gray-500">
+                              {booking.date && (
+                                <span className="mr-2 flex items-center">
+                                  📅 {new Date(booking.date).toLocaleDateString()}
+                                </span>
+                              )}
+                              <span className="flex items-center">⏰ {booking.shiftOrSlot}</span>
+                            </div>
+                          </div>
 
-                                  {activeTab === 'today' && selectedDate === new Date().toISOString().split('T')[0] && (
-                                    <div className="flex items-center space-x-3">
-                                      <span
-                                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                          booking.status === 'Completed'
-                                            ? 'bg-green-100 text-green-800'
-                                            : booking.status === 'With_Doctor'
-                                            ? 'bg-blue-100 text-blue-800'
-                                            : booking.status === 'Waiting'
+                          {/* Details */}
+                          <div className="mt-2 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
+                            <div>
+                              <p className="text-xs sm:text-sm text-gray-600">{booking.type}</p>
+                              <p className="text-xs text-gray-500 mt-1 flex items-center">
+                                <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                {booking.patientGender}
+                                <svg className="mx-2 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                </svg>
+                                <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                </svg>
+                                {booking.patientPhone}
+                              </p>
+                            </div>
+
+                            {activeTab === 'today' &&
+                              selectedDate === new Date().toISOString().split('T')[0] && (
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 space-y-2 sm:space-y-0">
+                                  <span
+                                    className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium ${booking.status === 'Completed'
+                                        ? 'bg-green-100 text-green-800'
+                                        : booking.status === 'With_Doctor'
+                                          ? 'bg-blue-100 text-blue-800'
+                                          : booking.status === 'Waiting'
                                             ? 'bg-yellow-100 text-yellow-800'
                                             : 'bg-gray-100 text-gray-800'
-                                        }`}
-                                      >
-                                        {booking.status.replace(/_/g, ' ')}
-                                      </span>
-
-                                      <div className="relative">
-                                        <select
-                                          onChange={(e) =>
-                                            updateStatus(booking.id, parseInt(e.target.value), booking.bookingType)
-                                          }
-                                          className="block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-xs"
-                                          value={booking.statusId}
-                                        >
-                                          {statusList.map((status) => (
-                                            <option key={status.statusId} value={status.statusId}>
-                                              {status.status.replace(/_/g, ' ')}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                    </div>
-                                  )}
-
+                                      }`}
+                                  >
+                                    {booking.status.replace(/_/g, ' ')}
+                                  </span>
+                                  <select
+                                    onChange={(e) =>
+                                      updateStatus(
+                                        booking.id,
+                                        parseInt(e.target.value),
+                                        booking.bookingType
+                                      )
+                                    }
+                                    className="block w-full sm:w-auto py-1.5 pl-2 pr-6 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-[11px] sm:text-xs"
+                                    value={booking.statusId}
+                                  >
+                                    {statusList.map((status) => (
+                                      <option key={status.statusId} value={status.statusId}>
+                                        {status.status.replace(/_/g, ' ')}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </div>
-
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
+                              )}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  )
+                )}
+              </ul>
             </div>
           </div>
+
         </div>
       </main>
 
@@ -876,20 +1122,21 @@ export default function Dashboard() {
       {/* Slots Modal */}
       {showSlotsModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg lg:max-w-2xl animate-scale-in"> <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
-            <h3 className="text-xl font-semibold text-gray-900">
-              Manage Appointment Slots
-            </h3>
-            <button
-              onClick={() => setShowSlotsModal(false)}
-              className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
-            >
-              <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
-              </svg>
-              <span className="sr-only">Close modal</span>
-            </button>
-          </div>
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg lg:max-w-2xl animate-scale-in">
+            <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Manage Appointment Slots
+              </h3>
+              <button
+                onClick={() => setShowSlotsModal(false)}
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
+              >
+                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                </svg>
+                <span className="sr-only">Close modal</span>
+              </button>
+            </div>
 
             <div className="p-4 md:p-5 space-y-4 overflow-y-auto max-h-96">
               {/* Date filter for slots */}
@@ -898,6 +1145,7 @@ export default function Dashboard() {
                 <input
                   type="date"
                   value={slotFilterDate}
+                  min={getTodayDate()}
                   onChange={(e) => handleSlotDateFilter(e.target.value)}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
@@ -909,6 +1157,7 @@ export default function Dashboard() {
                   <input
                     type="date"
                     value={newSlot.date}
+                    min={getTodayDate()}
                     onChange={(e) => setNewSlot({ ...newSlot, date: e.target.value })}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
@@ -918,7 +1167,7 @@ export default function Dashboard() {
                   <input
                     type="time"
                     value={newSlot.startTime}
-                    onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
+                    onChange={(e) => handleSlotTimeChange('startTime', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
@@ -927,11 +1176,17 @@ export default function Dashboard() {
                   <input
                     type="time"
                     value={newSlot.endTime}
-                    onChange={(e) => setNewSlot({ ...newSlot, endTime: e.target.value })}
+                    onChange={(e) => handleSlotTimeChange('endTime', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
               </div>
+
+              {slotError && (
+                <div className="text-red-600 text-sm bg-red-50 p-2 rounded-md">
+                  {slotError}
+                </div>
+              )}
 
               <button
                 onClick={addSlot}
@@ -955,9 +1210,6 @@ export default function Dashboard() {
                             {slot.isBooked ? 'Booked' : 'Available'}
                           </span>
                         </div>
-                        {/* <span className="text-sm text-gray-500">
-                          {new Date(slot.slotDate).toLocaleDateString()}
-                        </span> */}
                       </li>
                     ))}
                   </ul>
@@ -973,20 +1225,21 @@ export default function Dashboard() {
       {/* Shifts Modal */}
       {showShiftsModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg animate-scale-in">  <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
-            <h3 className="text-xl font-semibold text-gray-900">
-              Manage OPD Shifts
-            </h3>
-            <button
-              onClick={() => setShowShiftsModal(false)}
-              className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
-            >
-              <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
-              </svg>
-              <span className="sr-only">Close modal</span>
-            </button>
-          </div>
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg animate-scale-in">
+            <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Manage OPD Shifts
+              </h3>
+              <button
+                onClick={() => setShowShiftsModal(false)}
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
+              >
+                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                </svg>
+                <span className="sr-only">Close modal</span>
+              </button>
+            </div>
 
             <div className="p-4 md:p-5 space-y-4">
               <div className="grid grid-cols-1 gap-4">
@@ -1011,7 +1264,7 @@ export default function Dashboard() {
                     <input
                       type="time"
                       value={newShift.startTime}
-                      onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })}
+                      onChange={(e) => handleShiftTimeChange('startTime', e.target.value)}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                   </div>
@@ -1020,7 +1273,7 @@ export default function Dashboard() {
                     <input
                       type="time"
                       value={newShift.endTime}
-                      onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })}
+                      onChange={(e) => handleShiftTimeChange('endTime', e.target.value)}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                   </div>
@@ -1036,6 +1289,12 @@ export default function Dashboard() {
                   />
                 </div>
               </div>
+
+              {shiftError && (
+                <div className="text-red-600 text-sm bg-red-50 p-2 rounded-md">
+                  {shiftError}
+                </div>
+              )}
 
               <button
                 onClick={addShift}
@@ -1058,13 +1317,92 @@ export default function Dashboard() {
                           <span className="text-sm text-gray-500">{shift.startTime} - {shift.endTime}</span>
                         </div>
                         <div className="mt-1 text-sm text-gray-500">
-                          Max Patients: {shift.maxAllowedPatients}
+                          Max Patients: {shift.maxPatients}
                         </div>
                       </li>
                     ))}
                   </ul>
                 ) : (
                   <p className="text-gray-500">No shifts configured yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Closed Dates Modal */}
+      {showClosedDatesModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full md:max-w-lg animate-scale-in">
+            <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Manage OPD Closed Dates
+              </h3>
+              <button
+                onClick={() => setShowClosedDatesModal(false)}
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"
+              >
+                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                </svg>
+                <span className="sr-only">Close modal</span>
+              </button>
+            </div>
+
+            <div className="p-4 md:p-5 space-y-4">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Add Closed Date</label>
+                <input
+                  type="date"
+                  value={newClosedDate}
+                  min={getTodayDate()}
+                  onChange={(e) => setNewClosedDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+
+              {closedDateError && (
+                <div className="text-red-600 text-sm bg-red-50 p-2 rounded-md">
+                  {closedDateError}
+                </div>
+              )}
+
+              <button
+                onClick={addClosedDate}
+                className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                Add Closed Date
+              </button>
+
+              <div className="mt-6">
+                <h4 className="text-lg font-medium text-gray-900 mb-2">Current Closed Dates</h4>
+                {closedDates.length > 0 ? (
+                  <ul className="divide-y divide-gray-200">
+                    {closedDates.map((dateObj, index) => (
+                      <li key={index} className="py-3 flex justify-between items-center">
+                        <span className="font-medium">
+                          {new Date(dateObj.closedDate).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </span>
+                        {/* <button
+                          onClick={() => removeClosedDate(dateObj.closedDate)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          Remove
+                        </button> */}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">No closed dates configured yet.</p>
                 )}
               </div>
             </div>

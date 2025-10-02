@@ -48,7 +48,7 @@ export default function Login() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/getToken', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getToken`, {
         method: 'POST',
         headers: {
           'accept': '*/*',
@@ -65,7 +65,7 @@ export default function Login() {
 
       if (response.ok) {
         // Login successful - now fetch user data
-        const userResponse = await fetch('https://api.oneclickhelp.in/api/getUserDetails', {
+        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getUserDetails`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${data.token}`,
@@ -114,7 +114,7 @@ export default function Login() {
         {/* Logo/Header Section */}
         <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-blue-100 to-indigo-100 mb-4">
-              <img src="/logo.png" className="w-50" alt="Company Logo" />
+             <Link href="/"> <img src="/logo.png" className="w-50" alt="Company Logo" /></Link>
             </div>
           <h2 className="text-3xl font-bold text-gray-800">Doctor's Login</h2>
           <p className="text-gray-500 mt-2">Sign in to access your account</p>
@@ -211,6 +211,13 @@ export default function Login() {
             Don't have an account?{" "}
             <Link href="/doctor/register" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
               Sign up
+            </Link>
+          </p>
+
+          <p className="text-sm text-gray-600 mt-3">
+            Forgot your password?{" "}
+            <Link href="/doctor/reset-password" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+              Reset Now
             </Link>
           </p>
         </div>

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import Swal from "sweetalert2"
 import Header from "@/components/header/header"
 import Footer from "@/components/footer/footer"
+import Link from "next/link"
 
 export default function BookAppointment() {
   const { id } = useParams()
@@ -38,7 +39,7 @@ export default function BookAppointment() {
     const fetchDoctor = async () => {
       try {
         const res = await fetch(
-          `https://api.oneclickhelp.in/api/getDoctorsById?doctorId=${id}`
+          `${process.env.NEXT_PUBLIC_API_URL}api/getDoctorsById?doctorId=${id}`
         )
         if (!res.ok) throw new Error("Failed to fetch doctor")
         const data = await res.json()
@@ -63,10 +64,10 @@ export default function BookAppointment() {
 
         if (doctorData.is_token) {
           // For tokens, use the OPD shifts API
-          apiUrl = `https://api.oneclickhelp.in/api/getDoctorOPDShifts?doctorId=${id}`
+          apiUrl = `${process.env.NEXT_PUBLIC_API_URL}api/getDoctorOPDShifts?doctorId=${id}`
         } else {
           // For appointments, use the slots API
-          apiUrl = `https://api.oneclickhelp.in/api/getDoctorSlots?doctorId=${id}&date=${appointmentDate}`
+          apiUrl = `${process.env.NEXT_PUBLIC_API_URL}api/getDoctorSlots?doctorId=${id}&date=${appointmentDate}`
         }
 
         const res = await fetch(apiUrl)
@@ -107,8 +108,8 @@ export default function BookAppointment() {
       // Determine which API to use based on doctor type
       const isToken = doctorData?.is_token
       const apiUrl = isToken 
-        ? 'https://api.oneclickhelp.in/api/bookTokenByDoctor'
-        : 'https://api.oneclickhelp.in/api/bookAppointmentByDoctor'
+        ? `${process.env.NEXT_PUBLIC_API_URL}api/bookTokenByDoctor`
+        : `${process.env.NEXT_PUBLIC_API_URL}api/bookAppointmentByDoctor`
 
       // Prepare request body based on API
       const requestBody = isToken 
@@ -187,6 +188,9 @@ export default function BookAppointment() {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
           <div className="text-center mb-6">
+            <Link href="/doctor/dashboard" className="text-blue-500 hover:underline mb-4 inline-block">
+              &larr; Back to Dashboard
+            </Link>
             <h2 className="text-2xl font-bold text-gray-800">
               {doctorData?.is_token ? "Book Token" : "Book Appointment"}
             </h2>
@@ -259,19 +263,21 @@ export default function BookAppointment() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Appointment Date<span className="text-red-500">*</span>
+                Select Date<span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 value={appointmentDate}
                 onChange={(e) => {
-                  setAppointmentDate(e.target.value)
-                  handleInputChange("bookingDate", e.target.value)
+                  setAppointmentDate(e.target.value);
+                  handleInputChange("bookingDate", e.target.value);
                 }}
                 className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
                 min={today}
+                max={doctorData?.is_token ? today : new Date(new Date().setDate(new Date().getDate() + 60)).toISOString().split("T")[0]} 
               />
+
             </div>
 
             {loadingShifts ? (

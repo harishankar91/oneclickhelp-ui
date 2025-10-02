@@ -123,7 +123,7 @@ export default function Register() {
     const fetchStates = async () => {
       setLoadingStates(true)
       try {
-        const res = await fetch("https://api.oneclickhelp.in/api/getStatesList")
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getStatesList`)
         const data = await res.json()
         setStates(data)
       } catch (err) {
@@ -142,7 +142,7 @@ export default function Register() {
       if (!formData.stateId) return
       setLoadingDistricts(true)
       try {
-        const res = await fetch(`https://api.oneclickhelp.in/api/getDistrictsList?stateId=${formData.stateId}`)
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getDistrictsList?stateId=${formData.stateId}`)
         const data = await res.json()
         setDistricts(data)
       } catch (err) {
@@ -160,7 +160,7 @@ export default function Register() {
     const fetchSpecializations = async () => {
       setLoadingSpecializations(true)
       try {
-        const res = await fetch("https://api.oneclickhelp.in/api/getSpecializations")
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getSpecializations`)
         const data = await res.json()
         setSpecializations(data)
       } catch (err) {
@@ -178,7 +178,7 @@ export default function Register() {
     const fetchHospitals = async () => {
       setLoadingHospitals(true)
       try {
-        const res = await fetch("https://api.oneclickhelp.in/api/getHospitalList")
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getHospitalList`)
         const data = await res.json()
         setHospitals(data)
       } catch (err) {
@@ -263,7 +263,7 @@ export default function Register() {
 
     setSubmitting(true)
     try {
-      const res = await fetch("https://api.oneclickhelp.in/api/registerDoctor", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/registerDoctor`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

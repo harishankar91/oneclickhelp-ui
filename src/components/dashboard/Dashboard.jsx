@@ -21,6 +21,163 @@ export default function Dashboard() {
   const [loadingLiveStatus, setLoadingLiveStatus] = useState(false)
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0])
   const [isCurrentDate, setIsCurrentDate] = useState(true)
+  
+  // Token reschedule states
+  const [rescheduleData, setRescheduleData] = useState({
+    tokenId: null,
+    bookingDate: new Date().toISOString().split('T')[0],
+    shiftId: null
+  })
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false)
+  const [rescheduleLoading, setRescheduleLoading] = useState(false)
+  const [shifts, setShifts] = useState([])
+
+  // Appointment reschedule states
+  const [appointmentRescheduleData, setAppointmentRescheduleData] = useState({
+    bookingId: null,
+    slotId: null,
+    bookingDate: new Date().toISOString().split('T')[0]
+  })
+  const [showAppointmentRescheduleModal, setShowAppointmentRescheduleModal] = useState(false)
+  const [appointmentRescheduleLoading, setAppointmentRescheduleLoading] = useState(false)
+  const [appointmentSlots, setAppointmentSlots] = useState([])
+
+  const fetchShifts = async (doctorId) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getDoctorOPDShifts?doctorId=${doctorId}`)
+      if (!res.ok) throw new Error("Failed to fetch shifts")
+      const data = await res.json()
+      setShifts(data.data)
+    } catch (err) {
+      console.error("Error fetching shifts:", err)
+      alert("Failed to fetch available shifts. Please try again.")
+    }
+  }
+
+  const fetchAppointmentSlots = async (doctorId, date) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getDoctorSlots?doctorId=${doctorId}&date=${date}`)
+      if (!res.ok) throw new Error("Failed to fetch appointment slots")
+      const data = await res.json()
+      setAppointmentSlots(data || [])
+    } catch (err) {
+      console.error("Error fetching appointment slots:", err)
+      alert("Failed to fetch available appointment slots. Please try again.")
+    }
+  }
+
+  const rescheduleToken = async () => {
+    if (!rescheduleData.bookingDate || !rescheduleData.shiftId) {
+      alert("Please select both date and shift")
+      return
+    }
+  
+    setRescheduleLoading(true)
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/rescheduleToken`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          oldBookingId: rescheduleData.tokenId,
+          bookingDate: rescheduleData.bookingDate,
+          shiftId: rescheduleData.shiftId
+        })
+      })
+  
+      if (!res.ok) throw new Error("Failed to reschedule token")
+  
+      const result = await res.json()
+      
+      if (result.status) {
+        alert("Token rescheduled successfully!")
+        setShowRescheduleModal(false)
+        
+        // Refresh the data
+        const userId = sessionStorage.getItem('userId')
+        if (userId) {
+          fetchUserData(userId)
+        }
+      } else {
+        throw new Error(result.message || "Failed to reschedule token")
+      }
+    } catch (err) {
+      alert(err.message || "Failed to reschedule token. Please try again.")
+    } finally {
+      setRescheduleLoading(false)
+    }
+  }
+
+  const rescheduleAppointment = async () => {
+    if (!appointmentRescheduleData.slotId) {
+      alert("Please select a slot")
+      return
+    }
+  
+    setAppointmentRescheduleLoading(true)
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/rescheduleAppointment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          oldBookingId: appointmentRescheduleData.bookingId,
+          slotId: appointmentRescheduleData.slotId
+        })
+      })
+    
+      const result = await res.json()
+      
+      if (result.status) {
+        alert("Appointment rescheduled successfully!")
+        setShowAppointmentRescheduleModal(false)
+        
+        // Refresh the data
+        const userId = sessionStorage.getItem('userId')
+        if (userId) {
+          fetchUserData(userId)
+        }
+      } else {
+        
+        throw new Error(result.message || "Failed to reschedule appointment")
+      }
+    } catch (err) {
+      alert(err.message || "Failed to reschedule appointment. Please try again.")
+    } finally {
+      setAppointmentRescheduleLoading(false)
+    }
+  }
+
+  const openRescheduleModal = (token) => {
+    setRescheduleData({
+      tokenId: token.id,
+      bookingDate: new Date().toISOString().split('T')[0],
+      shiftId: null
+    })
+    fetchShifts(token.doctorId)
+    setShowRescheduleModal(true)
+  }
+
+  const openAppointmentRescheduleModal = (appointment) => {
+    setAppointmentRescheduleData({
+      bookingId: appointment.bookingId,
+      slotId: null,
+      bookingDate: new Date().toISOString().split('T')[0]
+    })
+    fetchAppointmentSlots(appointment.doctorId, new Date().toISOString().split('T')[0])
+    setShowAppointmentRescheduleModal(true)
+  }
+
+  const handleAppointmentDateChange = (date) => {
+    setAppointmentRescheduleData(prev => ({ ...prev, bookingDate: date, slotId: null }))
+    // Find the appointment to get doctorId
+    const appointment = appointments.find(app => app.bookingId === appointmentRescheduleData.bookingId)
+    if (appointment) {
+      fetchAppointmentSlots(appointment.doctorId, date)
+    }
+  }
 
   useEffect(() => {
     const userId = sessionStorage.getItem('userId')
@@ -46,7 +203,7 @@ export default function Dashboard() {
   const fetchLiveStatus = async (doctorId, tokenId) => {
     setLoadingLiveStatus(true)
     try {
-      const res = await fetch(`https://api.oneclickhelp.in/api/liveStatus?doctorId=${doctorId}&token=${tokenId}`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/liveStatus?doctorId=${doctorId}&token=${tokenId}`)
       if (!res.ok) throw new Error("Failed to fetch live status")
       const data = await res.json()
       setLiveStatus(data)
@@ -66,7 +223,7 @@ export default function Dashboard() {
 
   const fetchStatusList = async () => {
     try {
-      const res = await fetch('https://api.oneclickhelp.in/api/getTokenStatusList')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getTokenStatusList`)
       if (!res.ok) throw new Error("Failed to fetch status list")
       const data = await res.json()
       setStatusList(data)
@@ -78,7 +235,7 @@ export default function Dashboard() {
   const fetchDoctorDetails = async (doctorId) => {
     try {
       const res = await fetch(
-        `https://api.oneclickhelp.in/api/getDoctorsById?doctorId=${doctorId}`
+        `${process.env.NEXT_PUBLIC_API_URL}api/getDoctorsById?doctorId=${doctorId}`
       )
       if (!res.ok) throw new Error("Failed to fetch doctor")
       const data = await res.json()
@@ -94,7 +251,7 @@ export default function Dashboard() {
       setLoading(true)
 
       // Fetch tokens
-      const tokensResponse = await fetch(`https://api.oneclickhelp.in/api/getTokenDetailsByUserId?userId=${userId}`)
+      const tokensResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getTokenDetailsByUserId?userId=${userId}`)
       if (tokensResponse.ok) {
         const tokensData = await tokensResponse.json()
         setTokens(tokensData)
@@ -114,7 +271,7 @@ export default function Dashboard() {
       }
 
       // Fetch appointments
-      const appointmentsResponse = await fetch(`https://api.oneclickhelp.in/api/getAppointmentsByUser?userId=${userId}`)
+      const appointmentsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getAppointmentsByUser?userId=${userId}`)
       if (appointmentsResponse.ok) {
         const appointmentsData = await appointmentsResponse.json()
         if (appointmentsData.status && appointmentsData.data) {
@@ -490,9 +647,13 @@ export default function Dashboard() {
                               <div className="flex">
                                 <span className="text-sm text-gray-600 w-32 flex-shrink-0">Address:</span>
                                 <span className="text-sm font-medium text-gray-900">
-                                  {[token.address_1, token.address_2, token.landmark]
+                                  {[token.address_1, token.address_2]
                                     .filter(Boolean).join(", ") || "Not available"}
                                 </span>
+                              </div>
+                              <div className="flex">
+                                <span className="text-sm text-gray-600 w-32 flex-shrink-0">Landmark:</span>
+                                <span className="text-sm font-medium text-gray-900">{token.landmark}</span>
                               </div>
                             </div>
                           </div>
@@ -501,8 +662,10 @@ export default function Dashboard() {
                         {/* Only show action buttons if token is for today */}
                         {isTokenToday && (
                           <div className="mt-6 flex space-x-3">
-                           
-                            <button className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 py-2 px-4 rounded-md transition-colors duration-200">
+                            <button 
+                              onClick={() => openRescheduleModal(token)}
+                              className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 py-2 px-4 rounded-md transition-colors duration-200"
+                            >
                               Reschedule
                             </button>
                           </div>
@@ -578,6 +741,76 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
+
+                  {showRescheduleModal && (
+                    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+                      <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm" onClick={() => setShowRescheduleModal(false)}></div>
+
+                      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative z-10">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-xl font-bold text-gray-800">Reschedule Token</h3>
+                          <button onClick={() => setShowRescheduleModal(false)} className="text-gray-500 hover:text-gray-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
+                            <input
+                              type="date"
+                              min={new Date().toISOString().split('T')[0]}
+                              value={rescheduleData.bookingDate}
+                              onChange={(e) => setRescheduleData(prev => ({ ...prev, bookingDate: e.target.value }))}
+                              className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Select Shift</label>
+                            <select
+                              value={rescheduleData.shiftId || ""}
+                              onChange={(e) => setRescheduleData(prev => ({ ...prev, shiftId: parseInt(e.target.value) }))}
+                              className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="">Choose a shift</option>
+                              {shifts.map(shift => (
+                                <option key={shift.shiftId} value={shift.shiftId}>{shift.shiftName}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end space-x-3">
+                          <button
+                            onClick={() => setShowRescheduleModal(false)}
+                            className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded-md transition-colors duration-200"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={rescheduleToken}
+                            disabled={rescheduleLoading}
+                            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {rescheduleLoading ? (
+                              <>
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Rescheduling...
+                              </>
+                            ) : (
+                              'Reschedule Token'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -608,6 +841,10 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredAppointments.map((appointment) => {
                     const doctor = doctorDetails[appointment.doctorId];
+                    // Check if appointment booking date is today or future
+                    const isAppointmentActive = appointment.bookingDate && 
+                    appointment.bookingDate.split('T')[0] === new Date().toISOString().split('T')[0];
+                    
                     return (
                       <div key={appointment.bookingId} className="border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all duration-200 relative bg-white">
                         <div className="absolute top-5 right-5">
@@ -682,9 +919,13 @@ export default function Dashboard() {
                             <div className="flex">
                               <span className="text-sm text-gray-600 w-28 flex-shrink-0">Address:</span>
                               <span className="text-sm font-medium text-gray-900">
-                                {[appointment.address1, appointment.address2, appointment.landmark]
+                                {[appointment.address1, appointment.address2]
                                   .filter(Boolean).join(", ") || "Not available"}
                               </span>
+                            </div>
+                            <div className="flex">
+                              <span className="text-sm text-gray-600 w-28 flex-shrink-0">Landmark:</span>
+                              <span className="text-sm font-medium text-gray-900">{appointment.landmark}</span>
                             </div>
                             <div className="flex">
                               <span className="text-sm text-gray-600 w-28 flex-shrink-0">Phone:</span>
@@ -692,15 +933,20 @@ export default function Dashboard() {
                                 {doctor.hospitalDetails.phone_1 || doctor.hospitalDetails.phone_2 || doctor.hospitalDetails.landline || "NA"}
                               </span>
                             </div>
-                            <div className="flex">
-                              <span className="text-sm text-gray-600 w-28 flex-shrink-0">Email:</span>
-                              <span className="text-sm font-medium text-gray-900">
-                                {doctor.hospitalDetails.email || "NA"}
-                              </span>
-                            </div>
                           </div>
                         </div>
 
+                        {/* Only show reschedule button for active appointments */}
+                        {isAppointmentActive && appointment.status === "Booked" && (
+                          <div className="mt-6">
+                            <button 
+                              onClick={() => openAppointmentRescheduleModal(appointment)}
+                              className="w-full bg-purple-100 hover:bg-purple-200 text-purple-800 py-2 px-4 rounded-md transition-colors duration-200"
+                            >
+                              Reschedule Appointment
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -710,6 +956,83 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      {/* Appointment Reschedule Modal */}
+      {showAppointmentRescheduleModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm" onClick={() => setShowAppointmentRescheduleModal(false)}></div>
+
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative z-10">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800">Reschedule Appointment</h3>
+              <button onClick={() => setShowAppointmentRescheduleModal(false)} className="text-gray-500 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={appointmentRescheduleData.bookingDate}
+                  onChange={(e) => handleAppointmentDateChange(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Slot</label>
+                <select
+                  value={appointmentRescheduleData.slotId || ""}
+                  onChange={(e) => setAppointmentRescheduleData(prev => ({ ...prev, slotId: parseInt(e.target.value) }))}
+                  className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={appointmentSlots.length === 0}
+                >
+                  <option value="">Choose a slot</option>
+                  {appointmentSlots.map(slot => (
+                    <option key={slot.id} value={slot.id}>
+                      {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                    </option>
+                  ))}
+                </select>
+                {appointmentSlots.length === 0 && (
+                  <p className="text-sm text-gray-500 mt-1">No slots available for selected date</p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowAppointmentRescheduleModal(false)}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded-md transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={rescheduleAppointment}
+                disabled={appointmentRescheduleLoading || !appointmentRescheduleData.slotId}
+                className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {appointmentRescheduleLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Rescheduling...
+                  </>
+                ) : (
+                  'Reschedule Appointment'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

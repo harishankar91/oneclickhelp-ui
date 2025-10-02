@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { FaMapMarkerAlt, FaEnvelope, FaPhone, FaPaperPlane } from 'react-icons/fa';
 
 export default function ContactUs() {
-  const [form, setForm] = useState({ name: '', email: '', message: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState({ type: '', message: '' });
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -13,14 +14,43 @@ export default function ContactUs() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    console.log('Form submitted:', form);
-    alert('Message sent successfully!');
-    setForm({ name: '', email: '', message: '' });
-    setIsSubmitting(false);
+    setSubmitStatus({ type: '', message: '' });
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/addContactMessages`, {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          email: form.email,
+          message: form.message
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.status) {
+        setSubmitStatus({ 
+          type: 'success', 
+          message: 'Message sent successfully!' 
+        });
+        setForm({ name: '', phone: '', email: '', message: '' });
+      } else {
+        throw new Error(result.message || 'Failed to send message');
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setSubmitStatus({ 
+        type: 'error', 
+        message: error.message || 'Failed to send message. Please try again.' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -34,6 +64,17 @@ export default function ContactUs() {
             Have questions or want to work together? We'd love to hear from you.
           </p>
         </div>
+
+        {/* Status Message */}
+        {submitStatus.message && (
+          <div className={`mb-6 p-4 rounded-lg text-center ${
+            submitStatus.type === 'success' 
+              ? 'bg-green-100 text-green-800 border border-green-200' 
+              : 'bg-red-100 text-red-800 border border-red-200'
+          }`}>
+            {submitStatus.message}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           {/* Contact Information */}
@@ -87,7 +128,7 @@ export default function ContactUs() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name
+                  Full Name *
                 </label>
                 <input
                   type="text"
@@ -102,8 +143,25 @@ export default function ContactUs() {
               </div>
 
               <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number *
+                </label>
+                <input
+                  type="number"
+                  id="phone"
+                  name="phone"
+                  maxLength="10"
+                  value={form.phone}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  placeholder="Enter your phone number"
+                />
+              </div>
+
+              <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address
+                  Email Address *
                 </label>
                 <input
                   type="email"
@@ -119,7 +177,7 @@ export default function ContactUs() {
 
               <div>
                 <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
-                  Your Message
+                  Your Message *
                 </label>
                 <textarea
                   id="message"
@@ -136,7 +194,9 @@ export default function ContactUs() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`w-full flex items-center justify-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`w-full flex items-center justify-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${
+                  isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+                }`}
               >
                 {isSubmitting ? (
                   'Sending...'

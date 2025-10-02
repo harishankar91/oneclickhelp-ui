@@ -16,7 +16,7 @@ export default function HomeForm({ onDistrictSelect }) {
     const fetchStates = async () => {
       try {
         setError(null)
-        const response = await fetch("https://api.oneclickhelp.in/api/getStatesList", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getStatesList`, {
           headers: {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -79,7 +79,7 @@ export default function HomeForm({ onDistrictSelect }) {
         setLoadingDistricts(true)
         setError(null)
         const response = await fetch(
-          `https://api.oneclickhelp.in/api/getDistrictsList?stateId=${selectedState}`,
+          `${process.env.NEXT_PUBLIC_API_URL}api/getDistrictsList?stateId=${selectedState}`,
           {
             headers: {
               "Accept": "application/json",

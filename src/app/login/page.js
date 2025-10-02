@@ -9,6 +9,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [otpSent, setOtpSent] = useState(false)
+  const [otpSuccess, setOtpSuccess] = useState(false)
   const [otp, setOtp] = useState("")
   const [userId, setUserId] = useState("")
   const [countdown, setCountdown] = useState(0)
@@ -42,7 +43,7 @@ export default function Login() {
     setIsLoading(true)
     
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/generateAndSendOtp', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/generateAndSendOtp`, {
         method: 'POST',
         headers: {
           'accept': '*/*',
@@ -50,7 +51,8 @@ export default function Login() {
         },
         body: JSON.stringify({
           phone: phone,
-          roleId: 1
+          roleId: 1,
+          authType:'Login'
         })
       })
 
@@ -66,6 +68,7 @@ export default function Login() {
       }
 
       if (response.ok && data.status) {
+        setOtpSuccess(data.message || "OTP sent successfully")
         setOtpSent(true)
         setUserId(data.data.userId)
         setCountdown(60) // 60 seconds countdown
@@ -91,7 +94,7 @@ export default function Login() {
     setIsLoading(true)
     
     try {
-      const response = await fetch('https://api.oneclickhelp.in/api/verify-otp', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/verify-otp`, {
         method: 'POST',
         headers: {
           'accept': '*/*',
@@ -100,6 +103,7 @@ export default function Login() {
         body: JSON.stringify({
           phone: phone,
           otp: otp,
+          roleId:1,
           userId: userId
         })
       })
@@ -128,50 +132,7 @@ export default function Login() {
         setError(data.message || "Invalid OTP. Please try again.")
       }
     } catch (error) {
-      console.error("OTP verification error:", error)
-      setError(error.message || "Network error. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const resendOtp = async () => {
-    if (countdown > 0) return
-    
-    setError("")
-    setIsLoading(true)
-    
-    try {
-      const response = await fetch('https://api.oneclickhelp.in/api/generateAndSendOtp', {
-        method: 'POST',
-        headers: {
-          'accept': '*/*',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phone: phone,
-          roleId: 1
-        })
-      })
-
-      // Handle non-JSON responses
-      const contentType = response.headers.get("content-type");
-      let data;
-      
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text || `Server returned ${response.status}: ${response.statusText}`);
-      }
-
-      if (response.ok && data.status) {
-        setCountdown(60) // Reset countdown
-      } else {
-        setError(data.message || "Failed to resend OTP")
-      }
-    } catch (error) {
-      console.error("OTP resend error:", error)
+      // console.error("OTP verification error:", error)
       setError(error.message || "Network error. Please try again.")
     } finally {
       setIsLoading(false)
@@ -235,20 +196,13 @@ export default function Login() {
                     disabled={isLoading}
                   />
                 </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  {countdown > 0 ? (
-                    <span>Resend OTP in {countdown} seconds</span>
-                  ) : (
-                    <button 
-                      type="button" 
-                      className="text-blue-600 hover:text-blue-800 font-medium"
-                      onClick={resendOtp}
-                      disabled={isLoading}
-                    >
-                      Resend OTP
-                    </button>
-                  )}
-                </div>
+               
+              </div>
+            )}
+
+{otpSuccess && (
+              <div className="text-green-600 text-sm text-center">
+                {otpSuccess}
               </div>
             )}
 
@@ -269,6 +223,7 @@ export default function Login() {
                 otpSent ? "Verify OTP" : "Send OTP"
               )}
             </button>
+
           </form>
           
         </div>

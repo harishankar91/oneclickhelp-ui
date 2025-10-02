@@ -31,7 +31,7 @@ export default function UploadPhoto() {
 
   const fetchDoctorData = async () => {
     try {
-      const response = await fetch(`https://api.oneclickhelp.in/api/getDoctorsById?doctorId=${doctorId}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/getDoctorsById?doctorId=${doctorId}`);
       const data = await response.json();
       setDoctorData(data);
 
@@ -87,7 +87,7 @@ export default function UploadPhoto() {
       const formData = new FormData();
       formData.append('photo', selectedFile);
 
-      const response = await fetch(`https://api.oneclickhelp.in/api/uploadDoctorPhoto?doctorId=${doctorId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/uploadDoctorPhoto?doctorId=${doctorId}`, {
         method: 'POST',
         body: formData,
       });

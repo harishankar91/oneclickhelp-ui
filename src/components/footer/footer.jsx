@@ -2,6 +2,7 @@ import {
   FaFacebookF,
   FaTwitter,
   FaLinkedinIn,
+  FaWhatsapp,
 } from 'react-icons/fa';
 
 import styles from './styles/footer.module.scss';
@@ -21,15 +22,13 @@ export default function Footer() {
   
           {/* Social Media - Centered on mobile */}
           <div className="flex gap-5 order-1 md:order-2">
-            <a href="#" aria-label="Facebook" className="text-gray-400 hover:text-blue-500 transition-colors duration-200">
+            <a href="https://www.facebook.com/people/Oneclickhelp/61580422095287/" aria-label="Facebook" className="text-gray-400 hover:text-blue-500 transition-colors duration-200">
               <FaFacebookF size={16} />
             </a>
-            <a href="#" aria-label="Twitter" className="text-gray-400 hover:text-blue-400 transition-colors duration-200">
-              <FaTwitter size={16} />
+            <a href="https://wa.me/917015683482" aria-label="Twitter" className="text-gray-400 hover:text-blue-400 transition-colors duration-200">
+              <FaWhatsapp size={16} />
             </a>
-            <a href="#" aria-label="LinkedIn" className="text-gray-400 hover:text-blue-600 transition-colors duration-200">
-              <FaLinkedinIn size={16} />
-            </a>
+            
           </div>
         </div>
         

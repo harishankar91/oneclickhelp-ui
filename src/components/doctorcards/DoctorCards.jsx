@@ -39,7 +39,7 @@ export default function DoctorCards({ districtId, locationName = "" }) {
         setLoading(true)
         setError(null)
         const res = await fetch(
-          `https://api.oneclickhelp.in/api/getDoctorsByDistrict?districtId=${districtId}`,
+          `${process.env.NEXT_PUBLIC_API_URL}api/getDoctorsByDistrict?districtId=${districtId}`,
           { cache: "no-store" }
         )
         if (!res.ok) throw new Error("Failed to fetch doctors")
@@ -398,7 +398,7 @@ export default function DoctorCards({ districtId, locationName = "" }) {
                   <div className={styles.photoContainer}>
                     {/* {doctor?.photo_url ? ( */}
                       <img
-                        src={doctor.photo_url ? `https://api.oneclickhelp.in${doctor.photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
+                        src={doctor.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}${doctor.photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
                         alt={`${doctor?.name ?? "Doctor"} photo`}
                         className={styles.doctorPhoto}
                       />
