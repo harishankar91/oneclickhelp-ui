@@ -779,7 +779,7 @@ export default function Bookapointment() {
         <div className={styles.doctorSection}>
           <div className={styles.doctorProfile}>
             <img
-              src={photo_url ? `https://api.oneclickhelp.in${photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
+              src={photo_url ? `${process.env.NEXT_PUBLIC_API_URL}${photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
               alt={name}
               className={styles.doctorPhoto}
             />

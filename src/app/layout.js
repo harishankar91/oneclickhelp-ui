@@ -15,7 +15,7 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
-  title: "Oneclickhelp - Your one stop solution for health",
+  title: "Oneclickhelp - Because Your Health Can't Wait",
   description:
     "Oneclickhelp is a comprehensive health platform that connects users with healthcare professionals, offers medical consultations, and provides access to health resources.",
 };

@@ -206,7 +206,7 @@ export default function UploadPhoto() {
                       ) : (
 
                         <img
-                          src={doctorData.photo_url ? `https://api.oneclickhelp.in${doctorData.photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
+                          src={doctorData.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}${doctorData.photo_url}` : "https://www.iconpacks.net/icons/1/free-doctor-icon-313-thumb.png"}
                           className="h-full w-full object-fill"
                         />
                       )}
