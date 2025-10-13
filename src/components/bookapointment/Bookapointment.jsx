@@ -685,7 +685,7 @@ export default function Bookapointment() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          bookingId: bookingResult.data?.bookingId,
+          bookingId: bookingResult.data?.id,
           bookingType: doctorData.is_token ? "Token" : "Appointment",
           paymentStatus: "Success",
           transactionId: response.razorpay_payment_id
