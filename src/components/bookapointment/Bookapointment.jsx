@@ -6,6 +6,12 @@ import styles from "./styles/bookapointment.module.scss"
 import Link from "next/link"
 import Swal from "sweetalert2"
 
+// Remove the module declaration and use global declaration instead
+// This should be in a separate types file, but for now we'll declare it globally
+if (typeof window !== 'undefined') {
+  window.Razorpay = window.Razorpay || null;
+}
+
 export default function Bookapointment() {
   const { id } = useParams()
   const [doctorData, setDoctorData] = useState(null)
@@ -14,7 +20,7 @@ export default function Bookapointment() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [authToken, setAuthToken] = useState(null)
   const router = useRouter()
-  
+
   // OTP verification states
   const [otpSent, setOtpSent] = useState(false)
   const [otp, setOtp] = useState("")
@@ -42,15 +48,18 @@ export default function Bookapointment() {
   const [formData, setFormData] = useState({
     fullName: "",
     mobile: "",
-    email: "",
+    age: "",
     gender: "male"
   })
   const [someoneElseData, setSomeoneElseData] = useState({
     fullName: "",
     mobile: "",
-    email: "",
+    age: "",
     gender: "male"
   })
+
+  // Payment states
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
   // Fetch closed dates
   const fetchClosedDates = async () => {
@@ -85,7 +94,7 @@ export default function Bookapointment() {
 
   const [validationErrors, setValidationErrors] = useState({
     mobile: "",
-    email: "",
+    age: "",
     someoneElseMobile: "",
     someoneElseEmail: ""
   })
@@ -144,21 +153,43 @@ export default function Bookapointment() {
   const getNextAvailableDateConsideringAll = (dateString) => {
     let nextDate = new Date(dateString);
     const maxDate = getMaxDate();
-    
+
     while (true) {
       nextDate.setDate(nextDate.getDate() + 1);
       const nextDateString = nextDate.toISOString().split("T")[0];
-      
+
       // Stop if we exceed max date
       if (maxDate && nextDateString > maxDate) {
         return null;
       }
-      
+
       // Check if this date is available
       if (!isWeekOffDay(nextDateString) && !isDateClosed(nextDateString)) {
         return nextDateString;
       }
     }
+  };
+
+  // Load Razorpay script dynamically
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => {
+        console.log("Razorpay script loaded successfully");
+        resolve(true);
+      };
+      script.onerror = () => {
+        console.error("Failed to load Razorpay script");
+        resolve(false);
+      };
+      document.body.appendChild(script);
+    });
   };
 
   // Fetch doctor details
@@ -171,7 +202,7 @@ export default function Bookapointment() {
         if (!res.ok) throw new Error("Failed to fetch doctor")
         const data = await res.json()
         setDoctorData(data)
-        
+
         // Fetch closed dates after doctor data is loaded
         await fetchClosedDates()
       } catch (err) {
@@ -192,12 +223,17 @@ export default function Bookapointment() {
         ...prev,
         fullName: user.name,
         mobile: user.phone,
-        email: user.email,
+        age: user.age,
         gender: user.gender
       }))
       setIsLoggedIn(true)
     }
+
+    // Load Razorpay script
+    loadRazorpayScript()
   }, [id])
+
+
 
   // Fetch shifts when date changes or doctor data changes
   useEffect(() => {
@@ -277,7 +313,7 @@ export default function Bookapointment() {
   // OTP Functions
   const handleSendOtp = async () => {
     const patientData = patientType === "self" ? formData : someoneElseData
-    
+
     if (!validatePhone(patientData.mobile)) {
       setValidationErrors(prev => ({
         ...prev,
@@ -307,7 +343,7 @@ export default function Bookapointment() {
 
       const contentType = response.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
       } else {
@@ -344,7 +380,7 @@ export default function Bookapointment() {
 
     try {
       const patientData = patientType === "self" ? formData : someoneElseData
-      
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/verify-otp`, {
         method: 'POST',
         headers: {
@@ -355,13 +391,13 @@ export default function Bookapointment() {
           phone: patientData.mobile,
           otp: otp,
           userId: otpUserId,
-          roleId:1
+          roleId: 1
         })
       })
 
       const contentType = response.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
       } else {
@@ -375,7 +411,7 @@ export default function Bookapointment() {
         sessionStorage.setItem("userName", data.data.userName)
         sessionStorage.setItem('userRole', "1")
         setIsLoggedIn(true)
-        
+
         // Reset OTP state
         setOtpSent(false)
         setOtp("")
@@ -395,13 +431,13 @@ export default function Bookapointment() {
 
   const resendOtp = async () => {
     if (countdown > 0) return
-    
+
     setIsSendingOtp(true)
     setOtpError("")
 
     try {
       const patientData = patientType === "self" ? formData : someoneElseData
-      
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/generateAndSendOtp`, {
         method: 'POST',
         headers: {
@@ -419,7 +455,7 @@ export default function Bookapointment() {
 
       const contentType = response.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
       } else {
@@ -446,7 +482,7 @@ export default function Bookapointment() {
     try {
       setAuthError("")
       const patientData = patientType === "self" ? formData : someoneElseData
-      
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/registerUser`, {
         method: 'POST',
         headers: {
@@ -478,6 +514,333 @@ export default function Bookapointment() {
       return false
     }
   }
+
+  // Temporary debug function to test Razorpay
+  const testRazorpayIntegration = async (bookingResult) => {
+    try {
+      console.log("Testing Razorpay integration...");
+
+      // Test with a simple hardcoded order first
+      const testOrderData = {
+        amount: 100, // ₹1 in paise
+        currency: 'INR',
+        receipt: `test_${Date.now()}`,
+      };
+
+      console.log("Sending test order data:", testOrderData);
+
+      const orderResponse = await fetch(`/api/create-razorpay-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testOrderData)
+      });
+
+      const orderResult = await orderResponse.json();
+      console.log("Backend response:", orderResult);
+
+      if (!orderResult.success) {
+        throw new Error(`Backend error: ${orderResult.message}`);
+      }
+
+      if (!orderResult.data || !orderResult.data.id) {
+        throw new Error("Backend did not return a valid order ID");
+      }
+
+      console.log("Valid order ID received:", orderResult.data.id);
+      return orderResult.data.id;
+
+    } catch (error) {
+      console.error("Razorpay test failed:", error);
+      throw error;
+    }
+  };
+
+  // SIMPLIFIED Razorpay Function for Debugging
+  const initiateRazorpayPayment = async (bookingResult) => {
+    try {
+      setIsProcessingPayment(true);
+
+      // Load Razorpay script
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        throw new Error("Payment gateway not available");
+      }
+
+      if (!window.Razorpay) {
+        throw new Error("Razorpay SDK not loaded");
+      }
+
+      // Calculate amount - ensure it's at least ₹1 (100 paise)
+      let amount = 100; // Start with minimum amount for testing
+      if (doctorData.is_token) {
+        amount = doctorData.is_fees_online ?
+          ((doctorData.tokenFees || 10) + 10) * 100 :
+          10 * 100;
+      } else {
+        amount = Math.round(doctorData.fees * 100);
+      }
+
+      // Ensure minimum amount
+      if (amount < 100) amount = 100;
+
+      console.log("🔄 Creating Razorpay order with amount:", amount, "paise");
+
+      // Create order on backend
+      const orderResponse = await fetch(`/api/create-razorpay-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: 100,
+          currency: 'INR',
+          receipt: `rcpt_${Date.now()}`,
+          notes: {
+            booking_type: doctorData.is_token ? 'token' : 'appointment',
+            doctor_id: id
+          }
+        })
+      });
+
+      const orderResult = await orderResponse.json();
+      console.log("📦 Backend order response:", orderResult);
+
+      if (!orderResult.success || !orderResult.data) {
+        throw new Error(orderResult.message || 'Invalid response from server');
+      }
+
+      if (!orderResult.data.id) {
+        throw new Error('No order ID received from server');
+      }
+
+      const orderId = orderResult.data.id;
+      console.log("✅ Valid Razorpay order ID:", orderId);
+
+      // Verify order ID format (should start with 'order_')
+      if (!orderId.startsWith('order_')) {
+        console.warn("⚠️ Order ID format may be incorrect. Expected format: 'order_XXXXXXXXXXXXXX'");
+      }
+
+      const patientData = patientType === "self" ? formData : someoneElseData;
+
+      // Razorpay options - SIMPLIFIED
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: orderResult.data.amount.toString(),
+        currency: orderResult.data.currency,
+        name: 'Oneclickhelp',
+        description: `${doctorData.is_token ? 'Token' : 'Appointment'} Booking`,
+        order_id: orderId, // Use the Razorpay order ID
+        handler: function (response) {
+          console.log("💰 Payment successful:", response);
+          handleSuccessfulPayment(response, bookingResult);
+        },
+        prefill: {
+          name: patientData.fullName || 'Customer',
+          email: patientData.email || 'customer@example.com',
+          contact: patientData.mobile || '9999999999',
+        },
+        theme: {
+          color: '#3399cc'
+        }
+      };
+
+      console.log("🎯 Opening Razorpay checkout...", options);
+
+      const razorpay = new window.Razorpay(options);
+
+      razorpay.on('payment.failed', function (response) {
+        console.error("❌ Payment failed:", response.error);
+        setIsProcessingPayment(false);
+        Swal.fire(
+          "Payment Failed",
+          response.error.description || "Payment failed. Please try again.",
+          "error"
+        );
+      });
+
+      razorpay.open();
+
+    } catch (error) {
+      console.error("💥 Payment initiation failed:", error);
+      setIsProcessingPayment(false);
+      Swal.fire(
+        "Payment Error",
+        error.message || "Failed to initialize payment. Please try again.",
+        "error"
+      );
+    }
+  };
+
+  // Separate function for successful payment handling
+  const handleSuccessfulPayment = async (response, bookingResult) => {
+    try {
+      console.log("🔄 Verifying payment...", response);
+
+      const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/updatePaymentStatus`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookingId: bookingResult.data?.bookingId,
+          bookingType: doctorData.is_token ? "Token" : "Appointment",
+          paymentStatus: "Success",
+          transactionId: response.razorpay_payment_id
+        })
+      });
+
+      const verifyData = await verifyResponse.json();
+      console.log("✅ Payment verification:", verifyData);
+
+      if (verifyData.success) {
+        await updateBookingWithPayment(bookingResult, response.razorpay_payment_id);
+      } else {
+        throw new Error(verifyData.message || "Payment verification failed");
+      }
+    } catch (error) {
+      console.error("❌ Payment handling error:", error);
+      Swal.fire("Payment Error", "Payment completed but verification failed. Please contact support.", "warning");
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Helper function to update booking with payment info
+  const updateBookingWithPayment = async (bookingResult, paymentId) => {
+    try {
+      const updateResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/update-booking-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookingId: bookingResult.data.bookingId,
+          token: bookingResult.data.token,
+          paymentId: paymentId,
+          isPaid: true,
+          paymentMethod: 'razorpay'
+        })
+      });
+
+      const updateData = await updateResponse.json();
+
+      if (updateData.success) {
+        await processSuccessfulBooking(bookingResult, paymentId);
+      } else {
+        throw new Error(updateData.message || "Failed to update booking payment");
+      }
+    } catch (error) {
+      console.error("Update booking error:", error);
+      Swal.fire("Booking Error", "Booking completed but payment update failed. Please contact support.", "warning");
+    }
+  };
+
+  // Helper function to process successful booking after payment
+  const processSuccessfulBooking = async (bookingResult, paymentId) => {
+    if (doctorData.is_token) {
+      Swal.fire({
+        title: "Token Booked 🎉",
+        html: `
+      <p>Your token has been booked successfully!</p>
+      <h2 style="margin-top:10px">Token Number: <b>${bookingResult.data?.token}</b></h2>
+      <p style="margin-top:10px">Payment ID: ${paymentId}</p>
+      ${doctorData.is_fees_online ?
+            `<p style="margin-top:10px; color: #d97706; font-weight: bold;">
+          Paid: ₹${((doctorData.tokenFees || 10) + 10)} (₹${doctorData.tokenFees || 10} token fee + ₹10 online fee)
+        </p>` :
+            `<p style="margin-top:10px; color: #d97706; font-weight: bold;">
+          Paid: ₹10 (Token fee)
+        </p>`
+          }
+    `,
+        icon: "success",
+        confirmButtonText: "Okay"
+      }).then((result) => {
+        if (result.isConfirmed) {
+          router.push("/user/dashboard");
+        }
+      });
+    } else {
+      Swal.fire({
+        title: "Appointment Booked 🎉",
+        html: `
+      <p>Your appointment has been booked successfully!</p>
+      <h2 style="margin-top:10px">Booking ID: <b>${bookingResult.data?.bookingId}</b></h2>
+      <p style="margin-top:10px">Payment ID: ${paymentId}</p>
+      <p style="margin-top:10px; color: #d97706; font-weight: bold;">
+        Paid: ₹${doctorData.fees}
+      </p>
+    `,
+        icon: "success",
+        confirmButtonText: "Okay"
+      }).then((result) => {
+        if (result.isConfirmed) {
+          router.push("/user/dashboard");
+        }
+      });
+    }
+  };
+
+  // Process booking after payment or for free bookings
+  const processBooking = async (paymentId = null) => {
+    const patientData = patientType === "self" ? formData : someoneElseData
+    const userId = sessionStorage.getItem("userId")
+
+    try {
+      let bookingRes
+      let bookingData
+
+      if (doctorData.is_token) {
+        bookingRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/bookToken`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            patientName: patientData.fullName,
+            patientGender: patientData.gender,
+            bookedBy: "patient",
+            user_id: userId,
+            patientAge: patientData.age,
+            patientPhone: patientData.mobile,
+            doctor_id: doctorData.doctorId || id,
+            bookingDate: appointmentDate,
+            shiftId: selectedShift.id,
+            paymentId: paymentId,
+            isPaid: !!paymentId
+          })
+        })
+        bookingData = await bookingRes.json()
+      } else {
+        bookingRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/bookAppointment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            doctorId: doctorData.doctorId || id,
+            userId: userId,
+            patientName: patientData.fullName,
+            patientPhone: patientData.mobile,
+            patientGender: patientData.gender,
+            slotId: selectedShift.id,
+            age: patientData.age,
+            bookedBy: "patient",
+            paymentId: paymentId,
+            isPaid: !!paymentId
+          })
+        })
+        bookingData = await bookingRes.json()
+      }
+
+      if (bookingData.status) {
+        return bookingData;
+      } else {
+        throw new Error(bookingData.message || "Booking failed");
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -521,7 +884,6 @@ export default function Bookapointment() {
     }
 
     setValidationErrors({})
-
     setIsSubmitting(true)
 
     if (!selectedShift) {
@@ -556,83 +918,64 @@ export default function Bookapointment() {
     const userId = sessionStorage.getItem("userId")
 
     try {
-      let bookingRes
-      let bookingData
+      const requiresPayment =
+        (doctorData.is_token && (doctorData.tokenFees || 10) > 0) ||
+        (!doctorData.is_token && doctorData.is_fees_online && doctorData.fees > 0);
 
-      if (doctorData.is_token) {
-        bookingRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/bookToken`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            patientName: patientData.fullName,
-            patientGender: patientData.gender,
-            bookedBy: "patient",
-            user_id: userId,
-            patientPhone: patientData.mobile,
-            doctor_id: doctorData.doctorId || id,
-            bookingDate: appointmentDate,
-            shiftId: selectedShift.id
-          })
-        })
-        bookingData = await bookingRes.json()
-      } else {
-        bookingRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/bookAppointment`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            doctorId: doctorData.doctorId || id,
-            userId: userId,
-            patientName: patientData.fullName,
-            patientPhone: patientData.mobile,
-            patientGender: patientData.gender,
-            slotId: selectedShift.id,
-            bookedBy: "patient",
-          })
-        })
-        bookingData = await bookingRes.json()
-      }
+      // SECOND: If payment is required, initiate Razorpay payment with the booking result
+      if (requiresPayment) {
 
-      if (bookingData.status) {
-        if (doctorData.is_token) {
-          Swal.fire({
-            title: "Token Booked 🎉",
-            html: `
-            <p>Your token has been booked successfully!</p>
-            <h2 style="margin-top:10px">Token Number: <b>${bookingData.data?.token}</b></h2>
-          `,
-            icon: "success",
-            confirmButtonText: "Okay"
-          }).then((result) => {
-            if (result.isConfirmed) {
-              router.push("/user/dashboard");
-            }
-          });
+        const bookingResult = await processBooking();
+
+        if (bookingResult.status) {
+          // Initiate Razorpay payment with the booking result
+          await initiateRazorpayPayment(bookingResult);
         } else {
-          Swal.fire({
-            title: "Appointment Booked 🎉",
-            html: `
-            <p>Your appointment has been booked successfully!</p>
-            <h2 style="margin-top:10px">Booking ID: <b>${bookingData.data?.bookingId}</b></h2>
-          `,
-            icon: "success",
-            confirmButtonText: "Okay"
-          }).then((result) => {
-            if (result.isConfirmed) {
-              router.push("/user/dashboard");
-            }
-          });
+          throw new Error(bookingResult.message || "Booking failed");
         }
       } else {
-        Swal.fire("Error", bookingData.message || "Booking failed", "error")
+        const bookingResult = await processBooking();
+        if (bookingResult.status) {
+
+          // Free booking - show success message directly
+          if (doctorData.is_token) {
+            Swal.fire({
+              title: "Token Booked 🎉",
+              html: `
+            <p>Your token has been booked successfully!</p>
+            <h2 style="margin-top:10px">Token Number: <b>${bookingResult.data?.token}</b></h2>
+          `,
+              icon: "success",
+              confirmButtonText: "Okay"
+            }).then((result) => {
+              if (result.isConfirmed) {
+                router.push("/user/dashboard");
+              }
+            });
+          } else {
+            Swal.fire({
+              title: "Appointment Booked 🎉",
+              html: `
+            <p>Your appointment has been booked successfully!</p>
+            <h2 style="margin-top:10px">Booking ID: <b>${bookingResult.data?.bookingId}</b></h2>
+          `,
+              icon: "success",
+              confirmButtonText: "Okay"
+            }).then((result) => {
+              if (result.isConfirmed) {
+                router.push("/user/dashboard");
+              }
+            });
+          }
+        }
       }
     } catch (error) {
       console.error("Booking error:", error)
-      Swal.fire("Error", "Something went wrong while booking. Please try again.", "error")
+      Swal.fire("Error", error.message || "Booking failed", "error")
     }
 
     setIsSubmitting(false)
   }
-
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -773,8 +1116,6 @@ export default function Bookapointment() {
           </>
         </div>
 
-
-
         {/* Doctor Section */}
         <div className={styles.doctorSection}>
           <div className={styles.doctorProfile}>
@@ -833,7 +1174,7 @@ export default function Bookapointment() {
             </p>
           </div>
         </div>
-        
+
 
         <Link href="/"><button className={styles.backBtn}>Go back to my results</button></Link>
       </div>
@@ -843,37 +1184,6 @@ export default function Bookapointment() {
         <h2 className={styles.patientTitle}>Patient Details</h2>
 
         <form onSubmit={handleSubmit} className={styles.patientForm}>
-          {/* patientType selection - Only show for appointments, not tokens */}
-          {/* {!is_token && (
-            <div className={styles.patientTypeSection}>
-              <p className={styles.appointmentFor}>
-                This in-clinic appointment is for:
-              </p>
-              <div className={styles.radioGroup}>
-                <label className={styles.radioOption}>
-                  <input
-                    type="radio"
-                    name="patientType"
-                    value="self"
-                    checked={patientType === "self"}
-                    onChange={(e) => setPatientType(e.target.value)}
-                  />
-                  <span className={styles.radioLabel}>Self</span>
-                </label>
-                <label className={styles.radioOption}>
-                  <input
-                    type="radio"
-                    name="patientType"
-                    value="other"
-                    checked={patientType === "other"}
-                    onChange={(e) => setPatientType(e.target.value)}
-                  />
-                  <span className={styles.radioLabel}>Someone Else</span>
-                </label>
-              </div>
-            </div>
-          )} */}
-
           {/* Patient form fields */}
           <div className={styles.formSection}>
             {is_token || patientType === "self" ? (
@@ -930,25 +1240,24 @@ export default function Bookapointment() {
                   </select>
                 </div>
 
-                {/* Show email only for appointments, not tokens */}
-                {!is_token && (
-                  <div className={styles.inputGroup}>
-                    <label className={styles.inputLabel}>
-                      Email (Optional)
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => {
-                        handleInputChange("email", e.target.value)
-                        setValidationErrors(prev => ({ ...prev, email: "" }))
-                      }}
-                      className={styles.textInput}
-                      placeholder="Enter Your Email Address"
-                    />
-                    {validationErrors.email && <p className={styles.validationError}>{validationErrors.email}</p>}
-                  </div>
-                )}
+
+                <div className={styles.inputGroup}>
+                  <label className={styles.inputLabel}>
+                    Age
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.age}
+                    onChange={(e) => {
+                      handleInputChange("age", e.target.value)
+                      setValidationErrors(prev => ({ ...prev, age: "" }))
+                    }}
+                    className={styles.textInput}
+                    placeholder="Enter Your Age"
+                  />
+                  {validationErrors.age && <p className={styles.validationError}>{validationErrors.age}</p>}
+                </div>
+
 
                 {/* OTP Verification Section */}
                 {!isLoggedIn && (
@@ -967,29 +1276,19 @@ export default function Bookapointment() {
                             placeholder="Enter 6-digit OTP"
                             maxLength="6"
                           />
-                          {/* <div className={styles.otpActions}>
-                            <button
-                              type="button"
-                              onClick={resendOtp}
-                              disabled={countdown > 0 || isSendingOtp}
-                              className={styles.resendBtn}
-                            >
-                              {isSendingOtp ? "Sending..." : countdown > 0 ? `Resend in ${countdown}s` : "Resend OTP"}
-                            </button>
-                          </div> */}
                         </div>
                         {otpSuccessMessage && <p className={styles.otpSuccess}>{otpSuccessMessage}</p>}
                         {otpError && <p className={styles.otpError}>{otpError}</p>}
                       </>
                     ) : (
                       <>
-                       {otpError ? (
-                        <p className={styles.otpError}>{otpError}</p>
-                      ) : (
-                        <div className={styles.otpNotice}>
-                          <p>You need to verify your mobile number before getting {is_token ? "token" : "booking"}</p>
-                        </div>
-                      )}     
+                        {otpError ? (
+                          <p className={styles.otpError}>{otpError}</p>
+                        ) : (
+                          <div className={styles.otpNotice}>
+                            <p>You need to verify your mobile number before getting {is_token ? "token" : "booking"}</p>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -1119,48 +1418,49 @@ export default function Bookapointment() {
           {/* Payment Section */}
           {is_token ? (
             <>
-            <div className="text-center">
-              <button
-                type="submit"
-                disabled={isSubmitting || !selectedShift || (isVerifyingOtp)}
-                className={styles.confirmBtn}
-              >
-                {isVerifyingOtp ? "Verifying OTP..." : 
-                 isSubmitting ? "Processing..." : 
-                 doctorData.is_fees_online ? `Pay ₹${tokenFees || 10}` : "Book Token"}
-              </button>
-            </div>
-            <div className="bg-white rounded-lg shadow-md mb-10 p-6 max-w-md w-full border-l-4 border-yellow-400">
-          <div className="flex items-start">
-            {/* Warning Icon */}
-            <div className="flex-shrink-0">
-              <svg
-                className="w-6 h-6 text-yellow-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            {/* Content */}
-            <div className="ml-3">
-              <h3 className="text-lg font-medium text-gray-900">Kindly Note:</h3>
-              <div className="mt-2 text-sm text-gray-700">
-                <p className="font-medium">
-                  The Token Fee is only for reserving your spot in the queue.
-                </p>
-                <p className="mt-2">
-                  The OPD Consultation Fee is a separate charge that you will need to
-                  pay to the doctor during your visit.
-                </p>
+              <div className="text-center">
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !selectedShift || (isVerifyingOtp) || isProcessingPayment}
+                  className={styles.confirmBtn}
+                >
+                  {isProcessingPayment ? "Processing Payment..." :
+                    isVerifyingOtp ? "Verifying OTP..." :
+                      isSubmitting ? "Processing..." :
+                        doctorData.is_fees_online ? `Pay ₹${tokenFees || 10}` : "Book Token"}
+                </button>
               </div>
-            </div>
-          </div>
-        </div></>
+              <div className="bg-white rounded-lg shadow-md mb-10 p-6 max-w-md w-full border-l-4 border-yellow-400">
+                <div className="flex items-start">
+                  {/* Warning Icon */}
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="w-6 h-6 text-yellow-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  {/* Content */}
+                  <div className="ml-3">
+                    <h3 className="text-lg font-medium text-gray-900">Kindly Note:</h3>
+                    <div className="mt-2 text-sm text-gray-700">
+                      <p className="font-medium">
+                        The Token Fee is only for reserving your spot in the queue.
+                      </p>
+                      <p className="mt-2">
+                        The OPD Consultation Fee is a separate charge that you will need to
+                        pay to the doctor during your visit.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div></>
           ) : (
             <div className={styles.paymentSection}>
               {doctorData.is_fees_online && (
@@ -1195,19 +1495,19 @@ export default function Bookapointment() {
 
               <button
                 type="submit"
-                disabled={isSubmitting || !selectedShift || (isVerifyingOtp)}
+                disabled={isSubmitting || !selectedShift || (isVerifyingOtp) || isProcessingPayment}
                 className={styles.confirmBtn}
               >
-                {isVerifyingOtp ? "Verifying OTP..." : 
-                 isSubmitting ? "Processing..." : 
-                 "Confirm Clinic Visit"}
+                {isProcessingPayment ? "Processing Payment..." :
+                  isVerifyingOtp ? "Verifying OTP..." :
+                    isSubmitting ? "Processing..." :
+                      "Confirm Clinic Visit"}
               </button>
             </div>
           )}
         </form>
-        
-      </div>
 
+      </div>
     </div>
   )
 }

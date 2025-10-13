@@ -1,5 +1,6 @@
 import { Inter } from "next/font/google";
 import { Roboto_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,7 +18,7 @@ const robotoMono = Roboto_Mono({
 export const metadata = {
   title: "Oneclickhelp - Because Your Health Can't Wait",
   description:
-    "Oneclickhelp is a comprehensive health platform that connects users with healthcare professionals, offers medical consultations, and provides access to health resources.",
+    "Book doctor appointments, manage clinic tokens, and access medical consultations with OneClickHelp - Because Your Health Can't Wait",
 };
 
 export default function RootLayout({ children }) {
@@ -32,6 +33,19 @@ export default function RootLayout({ children }) {
       <body
         className={`${inter.variable} ${robotoMono.variable} antialiased bg-white text-gray-900`}
       >
+        <Script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=G-RLXGCDCG7Y"
+        />
+        <Script id="google-analytics">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-RLXGCDCG7Y');
+          `}
+        </Script>
+
         {children}
       </body>
     </html>

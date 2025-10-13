@@ -59,7 +59,7 @@ export default function Header() {
         {/* Logo */}
         <div className={styles.logo}>
           <Link href="/" className={styles.logoLink}>
-            <span className={styles.logoText}><img src="/logo.png" className="w-30" /></span>
+            <span className={styles.logoText}><img src="/logo.png" alt="Oneclickhelp" className="w-30" /></span>
           </Link>
         </div>
 

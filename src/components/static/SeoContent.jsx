@@ -64,7 +64,7 @@ const SEOContent = () => {
         <div className="mt-16 prose prose-lg text-gray-600 max-w-4xl mx-auto">
           <h3 className="text-2xl font-bold text-gray-900 mb-6">Find Top-Rated Doctors Near You</h3>
           <p>
-            Our doctor appointment booking platform helps patients across India connect with qualified healthcare professionals quickly and easily. Whether you need a general physician consultation in Delhi, a dental checkup in Mumbai, or a specialist opinion in Bangalore, we've got you covered.
+            Our doctor appointment booking platform helps patients across India connect with qualified healthcare professionals quickly and easily. Whether you need a general physician consultation in Rewari, a dental checkup in Rewari, or a specialist opinion in Rewari, we've got you covered.
           </p>
           <p className="mt-4">
             With thousands of satisfied patients, we're revolutionizing how people access healthcare services. Our system shows real-time doctor availability, consultation fees, patient reviews, and clinic locations to help you make informed decisions about your healthcare.

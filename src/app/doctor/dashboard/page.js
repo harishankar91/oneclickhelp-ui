@@ -270,6 +270,7 @@ export default function Dashboard() {
         bookingType: 'Token',
         patientPhone: token.patientPhone,
         patientGender: token.patientGender,
+        patientAge: token.patientAge,
         tokenNumber: token.token,
         shiftOrSlot: token.shiftName,
         date: token.date
@@ -287,6 +288,7 @@ export default function Dashboard() {
         time: appointment.appointmentTime || 'Not specified',
         status: appointment.status,
         statusId: appointment.statusId,
+        patientAge: appointment.patientAge,
         type: 'Appointment',
         bookingType: 'Appointment',
         patientPhone: appointment.patientPhone,
@@ -342,6 +344,7 @@ export default function Dashboard() {
           bookingType: 'Token',
           patientPhone: token.patientPhone,
           patientGender: token.patientGender,
+          patientAge: token.patientAge,
           tokenNumber: token.token,
           shiftOrSlot: token.shiftName,
           date: token.bookingDate
@@ -361,6 +364,7 @@ export default function Dashboard() {
           time: appointment.appointmentTime || 'Not specified',
           status: appointment.status,
           statusId: appointment.statusId,
+          patientAge: appointment.patientAge,
           type: 'Appointment',
           bookingType: 'Appointment',
           patientPhone: appointment.patientPhone,
@@ -398,6 +402,7 @@ export default function Dashboard() {
         bookingType: 'Token',
         patientPhone: token.patientPhone,
         patientGender: token.patientGender,
+        patientAge: token.patientAge,
         tokenNumber: token.token,
         shiftOrSlot: token.shiftName,
         date: token.date
@@ -415,6 +420,7 @@ export default function Dashboard() {
         time: appointment.appointmentTime || 'Not specified',
         status: appointment.status,
         statusId: appointment.statusId,
+        patientAge: appointment.patientAge,
         type: 'Appointment',
         bookingType: 'Appointment',
         patientPhone: appointment.patientPhone,
@@ -881,6 +887,9 @@ export default function Dashboard() {
 
           {/* Stats Section */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            
+            {doctorData?.is_token && (
+              <>
             <div className="bg-white rounded-xl shadow-sm p-6 border border-blue-100">
               <div className="flex items-center">
                 <div className="rounded-lg bg-blue-100 p-3 mr-4">
@@ -894,21 +903,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-green-100">
-              <div className="flex items-center">
-                <div className="rounded-lg bg-green-100 p-3 mr-4">
-                  <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Total Appointments</p>
-                  <p className="text-2xl font-semibold text-gray-900">{statsData.totalAppointments}</p>
-                </div>
-              </div>
-            </div>
-
+            
             <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100">
               <div className="flex items-center">
                 <div className="rounded-lg bg-purple-100 p-3 mr-4">
@@ -923,6 +918,26 @@ export default function Dashboard() {
               </div>
             </div>
 
+            </>
+            )}
+
+            {doctorData?.is_appointment && (
+              <>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-green-100">
+              <div className="flex items-center">
+                <div className="rounded-lg bg-green-100 p-3 mr-4">
+                  <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Total Appointments</p>
+                  <p className="text-2xl font-semibold text-gray-900">{statsData.totalAppointments}</p>
+                </div>
+              </div>
+            </div>
+
+
             <div className="bg-white rounded-xl shadow-sm p-6 border border-orange-100">
               <div className="flex items-center">
                 <div className="rounded-lg bg-orange-100 p-3 mr-4">
@@ -936,6 +951,8 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+            </>
+            )}
           </div>
 
           {/* Appointments Section */}
@@ -1014,7 +1031,7 @@ export default function Dashboard() {
                     >
                       <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
                         {/* Avatar */}
-                        <div className="flex-shrink-0 self-center sm:self-start">
+                        <div className="flex-shrink-0  sm:self-start">
                           <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
                             <span className="text-blue-600 font-medium">
                               {booking.patient.charAt(0).toUpperCase()}
@@ -1066,6 +1083,10 @@ export default function Dashboard() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                 </svg>
                                 {booking.patientPhone}
+                                <svg className="mx-2 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                </svg>
+                               Age - {booking.patientAge}
                               </p>
                             </div>
 
