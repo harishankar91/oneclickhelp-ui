@@ -696,7 +696,7 @@ export default function Bookapointment() {
       console.log("✅ Payment verification:", verifyData);
 
       if (verifyData.success) {
-        await updateBookingWithPayment(bookingResult, response.razorpay_payment_id);
+          await processSuccessfulBooking(bookingResult, response.razorpay_payment_id);
       } else {
         throw new Error(verifyData.message || "Payment verification failed");
       }
@@ -705,36 +705,6 @@ export default function Bookapointment() {
       Swal.fire("Payment Error", "Payment completed but verification failed. Please contact support.", "warning");
     } finally {
       setIsProcessingPayment(false);
-    }
-  };
-
-  // Helper function to update booking with payment info
-  const updateBookingWithPayment = async (bookingResult, paymentId) => {
-    try {
-      const updateResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/update-booking-payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          bookingId: bookingResult.data.bookingId,
-          token: bookingResult.data.token,
-          paymentId: paymentId,
-          isPaid: true,
-          paymentMethod: 'razorpay'
-        })
-      });
-
-      const updateData = await updateResponse.json();
-
-      if (updateData.success) {
-        await processSuccessfulBooking(bookingResult, paymentId);
-      } else {
-        throw new Error(updateData.message || "Failed to update booking payment");
-      }
-    } catch (error) {
-      console.error("Update booking error:", error);
-      Swal.fire("Booking Error", "Booking completed but payment update failed. Please contact support.", "warning");
     }
   };
 
