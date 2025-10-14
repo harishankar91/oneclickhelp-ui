@@ -644,6 +644,16 @@ export default function Bookapointment() {
         },
         theme: {
           color: '#3399cc'
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessingPayment(false);
+            Swal.fire(
+              "Payment Cancelled",
+              "You cancelled the payment before completing it.",
+              "info"
+            );
+          }
         }
       };
 
@@ -695,7 +705,7 @@ export default function Bookapointment() {
       const verifyData = await verifyResponse.json();
       console.log("✅ Payment verification:", verifyData);
 
-      if (verifyData.success) {
+      if (verifyData.status) {
           await processSuccessfulBooking(bookingResult, response.razorpay_payment_id);
       } else {
         throw new Error(verifyData.message || "Payment verification failed");
