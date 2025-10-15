@@ -70,7 +70,7 @@ export default function ReminderPage() {
         setFollowupDate("");
         setNote("");
       } else {
-        setMessage({ type: "error", text: "Failed to send reminder. Please try again." });
+        setMessage({ type: "error", text: "Failed to send reminder to patient. Please try again." });
       }
     } catch (error) {
       console.error("Error sending reminder:", error);
