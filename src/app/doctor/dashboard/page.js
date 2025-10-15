@@ -813,7 +813,7 @@ export default function Dashboard() {
                           </button>
 
                           <button
-                            onClick={() => router.push(`/doctor/upload-photo/${doctorData?.doctorId}`)}
+                            onClick={() => router.push(`/doctor/reminder/${doctorData?.doctorId}`)}
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
                           >
                             <span className="flex cursor-pointer items-center">
