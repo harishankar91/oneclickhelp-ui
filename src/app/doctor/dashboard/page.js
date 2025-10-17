@@ -812,6 +812,116 @@ export default function Dashboard() {
                             </span>
                           </button>
 
+                          <div className="relative group">
+                            {doctorData?.reminderEnabled ? (
+                              <button
+                                onClick={() => router.push(`/doctor/reminder/${doctorData?.doctorId}`)}
+                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors"
+                              >
+                                <span className="flex cursor-pointer items-center">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-5 h-5 mr-2 text-blue-600"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                                    />
+                                  </svg>
+                                  Reminders
+                                </span>
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  disabled
+                                  className="flex items-center w-full px-4 py-2 text-sm text-gray-400 bg-gray-50 cursor-not-allowed rounded-md"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-5 h-5 mr-2 text-gray-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                                    />
+                                  </svg>
+                                  Reminders
+                                </button>
+
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded-md px-2 py-1 shadow-md z-10">
+                                  To enable this feature, Please contact support team !
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="relative group">
+                            {doctorData?.reminderEnabled ? (
+                              <button
+                                onClick={() => router.push(`/doctor/reports/${doctorData?.doctorId}`)}
+                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors"
+                              >
+                                <span className="flex cursor-pointer items-center">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-5 h-5 mr-2 text-blue-600"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h18v18H3z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 14v-4" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 17v-7" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12v-2" />
+                                  </svg>
+
+                                  Reports
+                                </span>
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  disabled
+                                  className="flex items-center w-full px-4 py-2 text-sm text-gray-400 bg-gray-50 cursor-not-allowed rounded-md"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-5 h-5 mr-2 text-gray-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                                    />
+                                  </svg>
+                                  Reports
+                                </button>
+
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded-md px-2 py-1 shadow-md z-10">
+                                  To enable this feature, Please contact support team !
+                                </div>
+                              </>
+                            )}
+                          </div>
+
                           <button
                             onClick={handleLogout}
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
