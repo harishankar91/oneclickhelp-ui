@@ -139,7 +139,7 @@ export default function UploadPhoto() {
                 <div className="flex items-center space-x-3">
                   <div className="hidden md:block text-right cursor-pointer">
                     <p className="text-sm font-medium text-gray-700">Dr. {userName}</p>
-                    <p className="text-xs font-medium text-gray-500">
+                    <p className="text-xs font-medium text-blue-500">
                       {doctorData?.doctorProfDetails?.specialization || 'Doctor'}
                     </p>
                   </div>

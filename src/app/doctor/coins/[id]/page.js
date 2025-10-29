@@ -111,7 +111,7 @@ export default function DoctorCoinsPage() {
 
         try 
         {
-          const purchaseRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-subscription`, {
+          const purchaseRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/purchase-subscription`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

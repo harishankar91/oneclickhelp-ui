@@ -25,8 +25,12 @@ export default function Footer() {
             <a href="https://www.facebook.com/people/Oneclickhelp/61580422095287/" aria-label="Facebook" className="text-gray-400 hover:text-blue-500 transition-colors duration-200">
               <FaFacebookF size={16} />
             </a>
-            <a href="https://wa.me/917015683482" aria-label="Twitter" className="text-gray-400 hover:text-blue-400 transition-colors duration-200">
+            <a href="https://wa.me/917015683482" aria-label="Whatsapp" className="text-gray-400 hover:text-blue-400 transition-colors duration-200">
               <FaWhatsapp size={16} />
+            </a>
+
+            <a href="https://www.linkedin.com/company/oneclickhelp" aria-label="Linkedin" className="text-gray-400 hover:text-blue-400 transition-colors duration-200">
+              <FaLinkedinIn size={16} />
             </a>
             
           </div>
