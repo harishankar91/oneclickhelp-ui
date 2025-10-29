@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Footer from "@/components/footer/footer";
 import { useRouter } from "next/navigation";
+import DateDisplay from "@/components/common/DateDisplay";
 
 export default function ReminderHistoryPage() {
   const [doctorData, setDoctorData] = useState(null);
@@ -24,6 +25,24 @@ export default function ReminderHistoryPage() {
       return;
     }
     fetchDoctorData();
+
+    // Get today's date
+    const today = new Date();
+
+    // Go back 7 days
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 7);
+
+    // Convert to YYYY-MM-DD format for input[type="date"]
+    const fromDate = pastDate.toISOString().split("T")[0];
+
+    const toDate = today.toISOString().split("T")[0];
+
+    setFromDate(fromDate);
+    setToDate(toDate);
+
+    //handleFetchReminders();
+
   }, [userId, router]);
 
   const fetchDoctorData = async () => {
@@ -86,7 +105,7 @@ export default function ReminderHistoryPage() {
           </Link>
           <div className="text-right">
             <p className="text-sm font-medium text-gray-700">Dr. {userName}</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-blue-500">
               {doctorData?.doctorProfDetails?.specialization || "Doctor"}
             </p>
           </div>
@@ -148,7 +167,7 @@ export default function ReminderHistoryPage() {
                 <button
                   onClick={handleFetchReminders}
                   disabled={fetching}
-                  className={`w-full py-2 px-4 rounded-md text-white font-medium ${
+                  className={`w-full py-2 px-4 rounded-md text-white font-medium cursor-pointer ${
                     fetching ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                   }`}
                 >
@@ -175,11 +194,11 @@ export default function ReminderHistoryPage() {
                 <table className="min-w-full border border-gray-200 rounded-lg">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-4 py-2 border-b text-left text-gray-600">#</th>
-                      <th className="px-4 py-2 border-b text-left text-gray-600">Patient Name</th>
-                      <th className="px-4 py-2 border-b text-left text-gray-600">Phone</th>
-                      <th className="px-4 py-2 border-b text-left text-gray-600">Doctor</th>
-                      <th className="px-4 py-2 border-b text-left text-gray-600">Sent On</th>
+                      <th className="px-4 py-2 border-b text-left text-blue-600">#</th>
+                      <th className="px-4 py-2 border-b text-left text-blue-600">Patient Name</th>
+                      <th className="px-4 py-2 border-b text-left text-blue-600">Phone Number</th>
+                      {/* <th className="px-4 py-2 border-b text-left text-blue-600">Doctor</th> */}
+                      <th className="px-4 py-2 border-b text-left text-blue-600">Sent On</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -188,8 +207,11 @@ export default function ReminderHistoryPage() {
                         <td className="px-4 py-2 border-b">{index + 1}</td>
                         <td className="px-4 py-2 border-b">{item.patientName}</td>
                         <td className="px-4 py-2 border-b">{item.patientPhone}</td>
-                        <td className="px-4 py-2 border-b">{item.doctorName}</td>
-                        <td className="px-4 py-2 border-b">{item.sentOn}</td>
+                        {/* <td className="px-4 py-2 border-b">{item.doctorName}</td> */}
+                        {/* <td className="px-4 py-2 border-b">{item.sentOn}</td> */}
+                        <td className="px-4 py-2 border-b">
+                          <DateDisplay date={item.sentOn} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
